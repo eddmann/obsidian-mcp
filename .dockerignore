@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+*.log
+*.tsbuildinfo
+
+# CDK
+cdk.out
+.cdk.staging
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Test
+coverage
+.nyc_output
+
+# Docs
+*.md
+!packages/app/package.json
+!package.json
+
+# Only include what we need from packages
+packages/cdk
+packages/*/node_modules
+packages/*/dist
+packages/*/*.log

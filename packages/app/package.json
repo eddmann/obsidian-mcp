@@ -1,0 +1,43 @@
+{
+  "name": "@obsidian-mcp/app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b && npm run build:stdio --workspace @obsidian-mcp/app && npm run build:http --workspace @obsidian-mcp/app && npm run build:lambda --workspace @obsidian-mcp/app",
+    "build:lambda": "esbuild src/server/lambda/index.ts --bundle --platform=node --target=node22 --format=cjs --tsconfig=tsconfig.json --outfile=dist/lambda/index.js",
+    "build:stdio": "esbuild src/server/local/stdio.ts --bundle --platform=node --target=node22 --format=esm --tsconfig=tsconfig.json --packages=external --outfile=dist/stdio/index.js",
+    "build:http": "esbuild src/server/local/http.ts --bundle --platform=node --target=node22 --format=esm --tsconfig=tsconfig.json --packages=external --outfile=dist/http/index.js",
+    "dev": "tsx src/server/local/stdio.ts",
+    "dev:http": "tsx src/server/local/http.ts",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.540.0",
+    "@aws-sdk/util-dynamodb": "^3.540.0",
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "serverless-http": "^3.2.0",
+    "simple-git": "^3.27.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "@types/supertest": "^2.0.16",
+    "esbuild": "^0.25.11",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.2",
+    "vitest": "^4.0.3"
+  }
+}

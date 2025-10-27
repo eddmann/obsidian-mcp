@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "../../dist/cdk",
+    "rootDir": ".",
+    "baseUrl": ".",
+    "tsBuildInfoFile": "../../dist/cdk.tsbuildinfo"
+  },
+  "include": ["bin/**/*", "lib/**/*"],
+  "references": []
+}

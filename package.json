@@ -1,0 +1,56 @@
+{
+  "name": "obsidian-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server for git-backed Obsidian vaults",
+  "keywords": [
+    "obsidian",
+    "mcp",
+    "lambda",
+    "aws"
+  ],
+  "author": "eddmann",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eddmann/obsidian-mcp.git"
+  },
+  "homepage": "https://github.com/eddmann/obsidian-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/eddmann/obsidian-mcp/issues"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b && npm run build --workspace @obsidian-mcp/app",
+    "build:lambda": "npm run build:lambda --workspace @obsidian-mcp/app",
+    "build:app": "npm run build --workspace @obsidian-mcp/app",
+    "build:cdk": "npm run build --workspace @obsidian-mcp/cdk",
+    "clean": "rm -rf dist && npm run clean --workspace @obsidian-mcp/app --if-present && npm run clean --workspace @obsidian-mcp/cdk --if-present",
+    "dev": "npm run dev --workspace @obsidian-mcp/app",
+    "dev:http": "npm run dev:http --workspace @obsidian-mcp/app",
+    "cdk:synth": "npm run build:lambda --workspace @obsidian-mcp/app && npm run synth --workspace @obsidian-mcp/cdk",
+    "cdk:deploy": "npm run build:lambda --workspace @obsidian-mcp/app && npm run deploy --workspace @obsidian-mcp/cdk",
+    "cdk:destroy": "npm run destroy --workspace @obsidian-mcp/cdk",
+    "lint": "eslint \"packages/**/*.{ts,tsx}\"",
+    "lint:fix": "npm run lint -- --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspace @obsidian-mcp/app",
+    "test:watch": "npm run test:watch --workspace @obsidian-mcp/app"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.172.0",
+    "eslint": "^9.13.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "typescript-eslint": "^8.15.0",
+    "typescript": "^5.7.3"
+  }
+}
