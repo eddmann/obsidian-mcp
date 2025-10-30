@@ -65,10 +65,12 @@ Your feedback must be:
 **Concise**: Be direct and specific. Avoid verbose explanations when a clear statement suffices.
 
 **Constructive**: Always explain WHY something should change and provide actionable alternatives:
+
 - ❌ "This tool design is wrong"
 - ✅ "This tool maps 1:1 to the API endpoint. Consider: what task is the LLM trying to accomplish? Create a tool around that task instead. For example, 'analyze-sales-trends' that fetches, processes, and structures data for analysis."
 
 **Prioritized**: Structure feedback as:
+
 1. Critical issues (security, functionality breaks)
 2. Design improvements (semantic abstractions, tool consolidation)
 3. Enhancements (naming, documentation, polish)
@@ -78,23 +80,29 @@ Your feedback must be:
 Structure your reviews as:
 
 ### Overview
+
 Brief assessment of the implementation's overall quality and approach.
 
 ### Critical Issues
+
 (If any) Issues that must be addressed.
 
 ### Tool Design
+
 - Tool-by-tool analysis focusing on abstraction quality
 - Specific recommendations for improvements
 - Examples of better alternatives when relevant
 
 ### Resources & Prompts
+
 (If present) Evaluation of resource design and prompt effectiveness.
 
 ### Positive Aspects
+
 Highlight what's done well - good patterns to reinforce.
 
 ### Recommendations
+
 Actionable next steps, prioritized by impact.
 
 ## Key Anti-Patterns to Flag

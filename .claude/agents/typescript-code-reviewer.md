@@ -56,6 +56,7 @@ Organize your review as follows:
 **Critical Issues**: Must-fix problems that affect correctness, type safety, or introduce bugs (if any)
 
 **Improvements**: Prioritized suggestions for better code quality, ordered by impact
+
 - Use clear headings for each improvement area
 - Provide specific line references when relevant
 - Include brief code examples for non-obvious suggestions
@@ -87,6 +88,7 @@ function getSuggestedExample(): SpecificType { ... }
 ## Self-Verification Checklist
 
 Before delivering your review, verify:
+
 - [ ] Did I identify actual issues or just state preferences?
 - [ ] Are my suggestions actionable and clear?
 - [ ] Did I provide reasoning for non-obvious recommendations?
@@ -105,6 +107,7 @@ Before delivering your review, verify:
 ## When to Seek Clarification
 
 Ask for context if:
+
 - The code's purpose or requirements are unclear
 - You see patterns that seem intentionally unconventional
 - Missing dependencies or types prevent full analysis
