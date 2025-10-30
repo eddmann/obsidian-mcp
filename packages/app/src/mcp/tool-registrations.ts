@@ -1,8 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { VaultManager } from '@/services/vault-manager';
 import * as toolDefs from '@/mcp/tool-definitions';
-import * as handlers from '@/mcp/tool-handlers';
-import type { ToolResponse } from '@/mcp/tool-handlers';
+import * as handlers from '@/mcp/handlers';
+import type { ToolResponse } from '@/mcp/handlers';
 
 type McpToolResult = {
   content: Array<{ type: 'text'; text: string }>;
