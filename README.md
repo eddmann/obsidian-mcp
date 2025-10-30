@@ -6,13 +6,19 @@ A Model Context Protocol (MCP) server for git-backed Obsidian vaults. Access and
 
 ## Overview
 
-This MCP server provides **16 tools** to interact with your Obsidian vault, organized into 5 categories:
+This MCP server provides **16 tools** and **1 resource** to interact with your Obsidian vault:
+
+**Tools** (organized into 5 categories):
 
 - File Operations (7 tools) - Read, create, edit, delete, move, append, and patch notes
 - Directory Operations (3 tools) - Create directories and list files
 - Search (1 tool) - Full-text search with regex support
 - Tag Management (4 tools) - Add, remove, rename, and manage tags
 - Journal Logging (1 tool) - Auto-log LLM activity to daily journals
+
+**Resources**:
+
+- Vault README - On-demand access to vault organization guidelines and structure
 
 **Deployment Options (all single-user):**
 
@@ -332,6 +338,37 @@ The journal tool automatically creates/appends to daily journal files with times
 | Tool                | Description                                                                                                               |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `log-journal-entry` | Automatically log activity to daily journal with timestamps, activity type, summary, topics, outputs, and project linking |
+
+## Available Resources
+
+MCP resources provide contextual information that LLMs can access on-demand without loading the data upfront.
+
+### Vault README
+
+| Resource       | URI                       | Description                                                                                                                                          |
+| -------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vault-readme` | `obsidian://vault-readme` | Provides access to the README.md file from your vault root containing organization guidelines, structure information, and vault-specific conventions |
+
+**Usage**: If your vault contains a README.md file in its root directory, LLMs can access it through this resource to understand how your vault is organized. This helps the LLM make better decisions about where to create files, how to structure notes, and follow your vault's conventions.
+
+**Example vault README.md**:
+
+```markdown
+# My Vault Organization
+
+## Folder Structure
+
+- `/Projects/` - Active project notes
+- `/Archive/` - Completed projects
+- `/Daily/` - Daily notes and journals
+- `/Templates/` - Note templates
+
+## Conventions
+
+- Use YAML frontmatter for metadata
+- Tag projects with #project/name
+- Link related notes with [[wikilinks]]
+```
 
 ## Development
 

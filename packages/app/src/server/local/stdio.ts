@@ -13,6 +13,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { GitVaultManager } from '@/services/git-vault-manager';
 import { registerTools } from '@/mcp/tool-registrations';
+import { registerResources } from '@/mcp/resource-registrations';
 import { loadEnv, ensureCoreEnvVars } from '@/env';
 import { MCP_SERVER_INSTRUCTIONS } from '@/server/shared/instructions';
 
@@ -45,6 +46,7 @@ console.error('Starting Obsidian MCP Server (local mode)...');
 console.error(`Vault path: ${LOCAL_VAULT_PATH}`);
 
 registerTools(mcpServer, () => vaultManager);
+registerResources(mcpServer, () => vaultManager);
 
 const transport = new StdioServerTransport();
 await mcpServer.connect(transport);

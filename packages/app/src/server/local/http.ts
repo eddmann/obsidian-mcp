@@ -14,6 +14,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import express from 'express';
 import { GitVaultManager } from '@/services/git-vault-manager';
 import { registerTools } from '@/mcp/tool-registrations';
+import { registerResources } from '@/mcp/resource-registrations';
 import { registerOAuthRoutes } from '@/server/shared/oauth-routes';
 import { registerMcpRoute } from '@/server/shared/mcp-routes';
 import { createInMemoryAuthStore } from '@/services/auth/auth-store';
@@ -58,6 +59,7 @@ const mcpServer = new McpServer({
 });
 
 registerTools(mcpServer, () => vaultManager);
+registerResources(mcpServer, () => vaultManager);
 
 const app = express();
 app.use(express.json());
