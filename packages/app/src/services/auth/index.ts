@@ -1,13 +1,3 @@
-/**
- * Authentication & OAuth Module
- *
- * Unified authentication module that provides:
- * - Session management
- * - OAuth 2.0 token operations
- * - Cookie utilities
- * - PKCE verification
- */
-
 export {
   createSession,
   getSession,
@@ -33,6 +23,6 @@ export {
   createInMemoryAuthStore,
   createDynamoDbAuthStore,
   type DynamoDbAuthStoreOptions,
-} from './auth-store.js';
+} from './stores/index.js';
 
 export { generateSecureToken, verifyCodeChallenge } from './pkce.js';

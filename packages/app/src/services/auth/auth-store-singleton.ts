@@ -1,4 +1,4 @@
-import type { AuthStore } from './auth-store.js';
+import type { AuthStore } from './stores/types.js';
 
 let authStore: AuthStore | null = null;
 

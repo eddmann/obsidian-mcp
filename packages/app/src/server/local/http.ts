@@ -17,7 +17,7 @@ import { registerTools } from '@/mcp/tool-registrations';
 import { registerResources } from '@/mcp/resource-registrations';
 import { registerOAuthRoutes } from '@/server/shared/oauth-routes';
 import { registerMcpRoute } from '@/server/shared/mcp-routes';
-import { createInMemoryAuthStore } from '@/services/auth/auth-store';
+import { createInMemoryAuthStore } from '@/services/auth/stores';
 import { setAuthStore } from '@/services/auth';
 import { loadEnv, ensureEnvVars } from '@/env';
 import { MCP_SERVER_INSTRUCTIONS } from '@/server/shared/instructions';

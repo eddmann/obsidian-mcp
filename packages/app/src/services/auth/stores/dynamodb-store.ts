@@ -5,203 +5,23 @@ import {
   PutItemCommand,
 } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
+import type {
+  AuthStore,
+  SessionData,
+  AuthCodeData,
+  AccessTokenData,
+  RefreshTokenData,
+} from './types.js';
 
 const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 
-export interface SessionData {
-  sessionId: string;
-  authenticated: boolean;
-  createdAt: number;
-  expiresAt: number;
-  pendingAuthRequest?: {
-    clientId: string;
-    redirectUri: string;
-    state?: string;
-    codeChallenge: string;
-    codeChallengeMethod: 'S256' | 'plain';
-  };
-}
-
-export interface AuthCodeData {
-  code: string;
-  codeChallenge: string;
-  codeChallengeMethod: 'S256' | 'plain';
-  redirectUri: string;
-  createdAt: number;
-  expiresAt: number;
-}
-
-export interface AccessTokenData {
-  token: string;
-  refreshToken: string;
-  createdAt: number;
-  expiresAt: number;
-  scope: string;
-}
-
-export interface RefreshTokenData {
-  refreshToken: string;
-  accessToken: string;
-}
-
-/**
- * SessionRepository - Browser session management
- *
- * Handles cookie-based authentication for the OAuth web pages (login, consent).
- * Sessions track logged-in users in the browser.
- */
-export interface SessionRepository {
-  getSession(sessionId: string): Promise<SessionData | null>;
-  setSession(session: SessionData): Promise<void>;
-  deleteSession(sessionId: string): Promise<void>;
-}
-
-/**
- * OAuthTokenRepository - OAuth 2.0 token management
- *
- * Handles all OAuth token lifecycle operations including:
- * - Authorization codes (temporary, single-use, 10min expiry)
- * - Access tokens (Bearer tokens for API auth, 1hr expiry)
- * - Refresh tokens (long-lived tokens to obtain new access tokens)
- */
-export interface OAuthTokenRepository {
-  getAuthCode(code: string): Promise<AuthCodeData | null>;
-  setAuthCode(data: AuthCodeData): Promise<void>;
-  deleteAuthCode(code: string): Promise<void>;
-
-  getAccessToken(token: string): Promise<AccessTokenData | null>;
-  setAccessToken(data: AccessTokenData): Promise<void>;
-  deleteAccessToken(token: string): Promise<void>;
-
-  getRefreshToken(refreshToken: string): Promise<RefreshTokenData | null>;
-  setRefreshToken(data: RefreshTokenData): Promise<void>;
-  deleteRefreshToken(refreshToken: string): Promise<void>;
-}
-
-/**
- * AuthStore - Combined authentication store
- *
- * Unified interface that includes both browser session management
- * and OAuth token operations. Implementations can use a single
- * storage backend (e.g., one DynamoDB table with prefixed keys).
- */
-export interface AuthStore extends SessionRepository, OAuthTokenRepository {}
-
-/**
- * InMemoryAuthStore - In-memory implementation
- *
- * Stores all data in memory using Map. Suitable for:
- * - Local development
- * - Testing
- * - Single-instance deployments
- *
- * Note: Data is lost when process restarts.
- */
-export class InMemoryAuthStore implements AuthStore {
-  private sessions = new Map<string, SessionData>();
-  private authCodes = new Map<string, AuthCodeData>();
-  private accessTokens = new Map<string, AccessTokenData>();
-  private refreshTokens = new Map<string, RefreshTokenData>();
-
-  async getSession(sessionId: string): Promise<SessionData | null> {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      return null;
-    }
-    return {
-      ...session,
-      pendingAuthRequest: session.pendingAuthRequest
-        ? { ...session.pendingAuthRequest }
-        : undefined,
-    };
-  }
-
-  async setSession(session: SessionData): Promise<void> {
-    const copy: SessionData = {
-      ...session,
-      pendingAuthRequest: session.pendingAuthRequest
-        ? { ...session.pendingAuthRequest }
-        : undefined,
-    };
-    this.sessions.set(session.sessionId, copy);
-  }
-
-  async deleteSession(sessionId: string): Promise<void> {
-    this.sessions.delete(sessionId);
-  }
-
-  async getAuthCode(code: string): Promise<AuthCodeData | null> {
-    return this.authCodes.get(code) || null;
-  }
-
-  async setAuthCode(data: AuthCodeData): Promise<void> {
-    this.authCodes.set(data.code, { ...data });
-  }
-
-  async deleteAuthCode(code: string): Promise<void> {
-    this.authCodes.delete(code);
-  }
-
-  async getAccessToken(token: string): Promise<AccessTokenData | null> {
-    return this.accessTokens.get(token) || null;
-  }
-
-  async setAccessToken(data: AccessTokenData): Promise<void> {
-    this.accessTokens.set(data.token, { ...data });
-    // Also store the bidirectional refresh token link
-    this.refreshTokens.set(data.refreshToken, {
-      refreshToken: data.refreshToken,
-      accessToken: data.token,
-    });
-  }
-
-  async deleteAccessToken(token: string): Promise<void> {
-    const data = this.accessTokens.get(token);
-    if (data) {
-      this.refreshTokens.delete(data.refreshToken);
-    }
-    this.accessTokens.delete(token);
-  }
-
-  async getRefreshToken(refreshToken: string): Promise<RefreshTokenData | null> {
-    return this.refreshTokens.get(refreshToken) || null;
-  }
-
-  async setRefreshToken(data: RefreshTokenData): Promise<void> {
-    this.refreshTokens.set(data.refreshToken, { ...data });
-  }
-
-  async deleteRefreshToken(refreshToken: string): Promise<void> {
-    this.refreshTokens.delete(refreshToken);
-  }
-}
-
-interface DynamoDbAuthStoreOptions {
+export interface DynamoDbAuthStoreOptions {
   tableName: string;
   region: string;
   ttlAttribute?: string;
   client?: DynamoDBClient;
 }
 
-/**
- * DynamoDbAuthStore - DynamoDB implementation
- *
- * Stores all data in a single DynamoDB table using prefixed keys:
- * - session:* - Browser sessions
- * - authcode:* - Authorization codes
- * - token:* - Access tokens
- * - refresh:* - Refresh tokens
- *
- * Suitable for:
- * - Production deployments
- * - Lambda environments
- * - Multi-instance scalability
- *
- * Features:
- * - TTL-based automatic cleanup
- * - Consistent reads for token validation
- * - Single-table design for cost efficiency
- */
 export class DynamoDbAuthStore implements AuthStore {
   private client: DynamoDBClient;
   private tableName: string;
@@ -454,26 +274,6 @@ export class DynamoDbAuthStore implements AuthStore {
   }
 }
 
-/**
- * Create an in-memory auth store
- *
- * Used by:
- * - Local HTTP server (development)
- * - Local stdio server (development)
- */
-export function createInMemoryAuthStore(): AuthStore {
-  console.error('[auth-store] Creating in-memory auth store');
-  return new InMemoryAuthStore();
-}
-
-/**
- * Create a DynamoDB auth store
- *
- * Used by:
- * - Lambda deployment (production)
- *
- * @param options - DynamoDB configuration
- */
 export function createDynamoDbAuthStore(options: DynamoDbAuthStoreOptions): AuthStore {
   console.error('[auth-store] Creating DynamoDB auth store:', {
     tableName: options.tableName,
@@ -482,8 +282,3 @@ export function createDynamoDbAuthStore(options: DynamoDbAuthStoreOptions): Auth
   });
   return new DynamoDbAuthStore(options);
 }
-
-/**
- * Export the options interface for external use
- */
-export type { DynamoDbAuthStoreOptions };

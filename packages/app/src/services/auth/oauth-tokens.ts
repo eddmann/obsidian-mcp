@@ -91,7 +91,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
   const refreshData = await store.getRefreshToken(refreshToken);
 
   if (!refreshData) {
-    return null; // Refresh token not found
+    return null;
   }
 
   const oldTokenData = await store.getAccessToken(refreshData.accessToken);

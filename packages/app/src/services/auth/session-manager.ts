@@ -1,13 +1,6 @@
-/**
- * Session Manager
- *
- * Manages user sessions including creation, retrieval, authentication,
- * and OAuth flow state (pending auth requests)
- */
-
 import crypto from 'crypto';
 import { getAuthStore } from './auth-store-singleton.js';
-import type { SessionData } from './auth-store.js';
+import type { SessionData } from './stores/types.js';
 
 const SESSION_EXPIRY_MS = Number(process.env.SESSION_EXPIRY_MS || 24 * 60 * 60 * 1000);
 
@@ -17,9 +10,6 @@ function generateSessionId(): string {
   return crypto.randomBytes(32).toString('base64url');
 }
 
-/**
- * Create a new session
- */
 export async function createSession(): Promise<string> {
   try {
     const sessionId = generateSessionId();
@@ -42,9 +32,6 @@ export async function createSession(): Promise<string> {
   }
 }
 
-/**
- * Get session by ID
- */
 export async function getSession(sessionId: string): Promise<Session | null> {
   try {
     if (!sessionId) {
@@ -70,9 +57,6 @@ export async function getSession(sessionId: string): Promise<Session | null> {
   }
 }
 
-/**
- * Authenticate a session with personal auth token
- */
 export async function authenticateSession(
   sessionId: string,
   providedToken: string,
@@ -115,9 +99,6 @@ export async function authenticateSession(
   return isValid;
 }
 
-/**
- * Store pending OAuth authorization request in session
- */
 export async function storePendingAuthRequest(
   sessionId: string,
   clientId: string,
@@ -155,9 +136,6 @@ export async function storePendingAuthRequest(
   }
 }
 
-/**
- * Get and clear pending auth request from session
- */
 export async function consumePendingAuthRequest(
   sessionId: string,
 ): Promise<Session['pendingAuthRequest'] | null> {
@@ -180,17 +158,11 @@ export async function consumePendingAuthRequest(
   return request;
 }
 
-/**
- * Check if session is authenticated
- */
 export async function isAuthenticated(sessionId: string): Promise<boolean> {
   const session = await getSession(sessionId);
   return session?.authenticated || false;
 }
 
-/**
- * Destroy a session
- */
 export async function destroySession(sessionId: string): Promise<void> {
   const store = getAuthStore();
   await store.deleteSession(sessionId);
