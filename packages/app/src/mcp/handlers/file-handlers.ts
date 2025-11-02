@@ -266,16 +266,27 @@ function patchAtHeading(
 
   for (let i = 0; i < lines.length; i++) {
     if (headingRegex.test(lines[i])) {
+      let processedContent = newContent;
+
+      // Check if the new content starts with a heading that matches the anchor heading
+      // This prevents accidental duplication when users include the heading in their content
+      const contentLines = newContent.split('\n');
+      if (contentLines.length > 0 && headingRegex.test(contentLines[0].trim())) {
+        // Strip the duplicate heading from the beginning
+        processedContent = contentLines.slice(1).join('\n');
+      }
+
       if (position === 'before') {
-        lines.splice(i, 0, newContent);
+        lines.splice(i, 0, processedContent);
       } else if (position === 'after') {
-        lines.splice(i + 1, 0, newContent);
+        lines.splice(i + 1, 0, processedContent);
       } else {
+        // replace: remove content under the heading and replace with new content
         let endIndex = i + 1;
         while (endIndex < lines.length && !/^#+\s+/.test(lines[endIndex])) {
           endIndex++;
         }
-        lines.splice(i + 1, endIndex - i - 1, newContent);
+        lines.splice(i + 1, endIndex - i - 1, processedContent);
       }
       return lines.join('\n');
     }
