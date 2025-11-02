@@ -86,26 +86,25 @@ export class GitVaultManager implements VaultManager {
       // Set the remote URL with embedded credentials for authenticated operations
       await vaultGit.remote(['set-url', 'origin', authUrl]);
 
-      const remoteCommit = (await Promise.race([
-        vaultGit.listRemote(['--heads', 'origin', this.config.branch]),
-        new Promise<string>((_, reject) =>
-          setTimeout(() => reject(new Error('Remote check timeout')), 5000),
+      // Fetch latest remote state with timeout
+      console.error('Fetching latest changes from remote...');
+      await Promise.race([
+        vaultGit.fetch('origin', this.config.branch),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('Fetch timeout')), 5000),
         ),
-      ])) as string;
+      ]);
 
-      const localCommit = await vaultGit.revparse(['HEAD']);
+      // Reset to clean "as cloned" state - matches remote exactly
+      console.error('Resetting vault to clean state...');
+      await vaultGit.reset(['--hard', `origin/${this.config.branch}`]);
 
-      if (remoteCommit.includes(localCommit.trim())) {
-        console.error('Vault is up to date');
-        return;
-      }
+      // Remove untracked files and directories (-f = force, -d = directories, -x = ignored files)
+      await vaultGit.clean('fdx');
 
-      console.error('Pulling latest changes...');
-      await vaultGit.pull('origin', this.config.branch, {
-        '--rebase': 'true',
-      });
+      console.error('Vault synced with remote');
     } catch (error) {
-      console.warn('Failed to check remote, using cached vault:', error);
+      console.warn('Failed to sync with remote, using cached vault:', error);
     }
   }
 
