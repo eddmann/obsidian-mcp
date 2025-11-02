@@ -13,7 +13,6 @@ export interface VaultConfig {
 
 export class GitVaultManager implements VaultManager {
   private config: VaultConfig;
-  private initialized = false;
 
   constructor(config: VaultConfig) {
     this.config = config;
@@ -37,24 +36,20 @@ export class GitVaultManager implements VaultManager {
   }
 
   /**
-   * Initialize the vault (clone or pull latest changes)
+   * Initialize the vault (clone or sync on every invocation)
+   * - Cold start: Clone the repo if it doesn't exist
+   * - Warm start: Sync with remote on every request
    */
   private async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
-
     const vaultExists = existsSync(this.config.vaultPath);
 
     if (!vaultExists) {
       console.error(`Cloning vault from ${this.config.repoUrl}...`);
       await this.cloneVault();
     } else {
-      console.error('Vault exists, checking for updates...');
+      console.error('Vault exists, syncing with remote...');
       await this.syncVault();
     }
-
-    this.initialized = true;
   }
 
   /**
