@@ -292,6 +292,10 @@ function patchAtLine(
 ): string {
   const lines = content.split('\n');
 
+  if (!Number.isInteger(lineNumber) || isNaN(lineNumber)) {
+    throw new Error(`Invalid line number: "${lineNumber}". Line number must be an integer.`);
+  }
+
   if (lineNumber < 1 || lineNumber > lines.length) {
     throw new Error(`Line ${lineNumber} out of range (1-${lines.length})`);
   }
