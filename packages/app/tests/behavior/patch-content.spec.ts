@@ -304,4 +304,227 @@ describe('Patch content behaviours', () => {
     expect(updated).toContain('tags: [one]');
     expect(updated).not.toContain('Old Title');
   });
+
+  describe('Auto-strip duplicate headings', () => {
+    it('strips duplicate heading when inserting with "after" position', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/duplicate.md': ['# Title', '', '## Target', 'Original content', ''].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/duplicate.md',
+        anchor_type: 'heading',
+        anchor_value: 'Target',
+        position: 'after',
+        content: '## Target\nNew content below',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/duplicate.md');
+      // Should strip the duplicate "## Target" from content
+      expect(updated).toBe(
+        ['# Title', '', '## Target', 'New content below', 'Original content', ''].join('\n'),
+      );
+      // Should NOT have duplicate heading
+      expect(updated.match(/## Target/g)?.length).toBe(1);
+    });
+
+    it('strips duplicate heading when inserting with "before" position', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/duplicate.md': ['# Title', '', '## Target', 'Original content'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/duplicate.md',
+        anchor_type: 'heading',
+        anchor_value: 'Target',
+        position: 'before',
+        content: '## Target\nNew content above',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/duplicate.md');
+      // Should strip the duplicate "## Target" from content
+      expect(updated).toContain('New content above\n## Target\nOriginal content');
+      // Should NOT have duplicate heading
+      expect(updated.match(/## Target/g)?.length).toBe(1);
+    });
+
+    it('strips duplicate heading when replacing content', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/replace.md': [
+          '# Main',
+          '',
+          '## Section',
+          'Old content',
+          'More old',
+          '',
+          '## Next Section',
+        ].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/replace.md',
+        anchor_type: 'heading',
+        anchor_value: 'Section',
+        position: 'replace',
+        content: '## Section\nReplacement content',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/replace.md');
+      // Should strip the duplicate "## Section" and only keep one
+      expect(updated).toContain('## Section\nReplacement content\n## Next Section');
+      expect(updated).not.toContain('Old content');
+      // Should NOT have duplicate heading
+      expect(updated.match(/## Section/g)?.length).toBe(1);
+    });
+
+    it('handles case-insensitive heading matching', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/case.md': ['## Target Heading', 'Content'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/case.md',
+        anchor_type: 'heading',
+        anchor_value: 'target heading',
+        position: 'after',
+        content: '## target heading\nNew content',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/case.md');
+      // Should strip the heading despite case difference
+      expect(updated).toContain('## Target Heading\nNew content\nContent');
+      // Should NOT have duplicate heading
+      expect(updated.toLowerCase().match(/## target heading/g)?.length).toBe(1);
+    });
+
+    it('preserves non-matching headings without stripping', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/different.md': ['## Target', 'Content'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/different.md',
+        anchor_type: 'heading',
+        anchor_value: 'Target',
+        position: 'after',
+        content: '## Different Heading\nNew content',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/different.md');
+      // Should keep "## Different Heading" because it doesn't match "Target"
+      expect(updated).toContain('## Target\n## Different Heading\nNew content\nContent');
+      expect(updated).toContain('## Different Heading');
+    });
+
+    it('handles different heading levels correctly', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/levels.md': ['## Target', 'Content'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/levels.md',
+        anchor_type: 'heading',
+        anchor_value: 'Target',
+        position: 'after',
+        content: '### Target\nNew subcontent',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/levels.md');
+      // Should strip "### Target" even though original is "##" (text matches)
+      expect(updated).toContain('## Target\nNew subcontent\nContent');
+      expect(updated).not.toContain('### Target');
+    });
+
+    it('handles content that is only a heading', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/only-heading.md': ['## Target', 'Original'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/only-heading.md',
+        anchor_type: 'heading',
+        anchor_value: 'Target',
+        position: 'after',
+        content: '## Target',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/only-heading.md');
+      // Should strip the duplicate heading, leaving no new content
+      // The heading itself stays, but content after stripping is empty
+      expect(updated).toBe(['## Target', '', 'Original'].join('\n'));
+    });
+  });
+
+  describe('Line number validation', () => {
+    it('rejects string values that cannot be parsed to integers', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/doc.md': ['Line 1', 'Line 2', 'Line 3'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/doc.md',
+        anchor_type: 'line',
+        anchor_value: '**Company Note:**',
+        position: 'replace',
+        content: 'New content',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Invalid line number');
+      expect(result.text).toContain('must be an integer');
+    });
+
+    it('rejects NaN values with clear error message', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/doc.md': ['Line 1', 'Line 2'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/doc.md',
+        anchor_type: 'line',
+        anchor_value: 'not-a-number',
+        position: 'after',
+        content: 'New content',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Invalid line number');
+      expect(result.text).toContain('must be an integer');
+    });
+
+    it('accepts valid integer strings', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/valid.md': ['Line 1', 'Line 2', 'Line 3'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/valid.md',
+        anchor_type: 'line',
+        anchor_value: '2',
+        position: 'replace',
+        content: 'Replaced content',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/valid.md');
+      expect(updated).toBe(['Line 1', 'Replaced content', 'Line 3'].join('\n'));
+    });
+  });
 });
