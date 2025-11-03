@@ -80,7 +80,9 @@ export const PatchContentSchema = {
     anchor_type: z
       .enum(['heading', 'block', 'frontmatter', 'line'])
       .describe('Type of anchor to insert at'),
-    anchor_value: z.string().describe('Heading name, block ID, frontmatter key, or line number'),
+    anchor_value: z
+      .string()
+      .describe('Heading name, block ID, frontmatter key, or 1-based line number'),
     position: z.enum(['before', 'after', 'replace']).describe('Where to insert relative to anchor'),
     create_if_missing: z.boolean().optional().describe('Create file if missing (default: true)'),
   },
