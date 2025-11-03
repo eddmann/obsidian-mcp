@@ -88,7 +88,7 @@ async function performFuzzySearch(
 
   const filenameFuse = new Fuse(filenameItems, {
     keys: ['filename'],
-    threshold: 0.75,
+    threshold: 0.6,
     includeScore: true,
     ignoreLocation: true,
   });
@@ -135,7 +135,7 @@ async function performFuzzySearch(
   // Fuzzy search content
   const contentFuse = new Fuse(contentItems, {
     keys: ['content'],
-    threshold: 0.75,
+    threshold: 0.6,
     includeScore: true,
     ignoreLocation: true,
   });
