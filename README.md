@@ -39,24 +39,19 @@ This enables LLM access to your vault without Obsidian being open, and keeps all
 
 ## Prerequisites
 
-**For Local Deployment:**
-- Node.js 22+ and npm, or
-- Docker
+**System Requirements:**
 
-**For Remote (AWS) Deployment:**
-- AWS Account with AWS Lambda access
+- Node.js 22+ and npm, OR Docker (for local deployment)
+- AWS Account with Lambda access (for remote AWS deployment only)
 
-## Vault Requirements
+**Vault Requirements:**
 
-Before using this server, ensure your Obsidian vault is:
-
-1. **Git-initialized** - Your vault must be a git repository
-2. **Pushed to remote** - Hosted on GitHub
-3. **Sync-enabled** - We recommend [obsidian-git](https://github.com/Vinzent03/obsidian-git) plugin for automatic sync
+1. **Git-initialized Obsidian vault** - Your vault must be a git repository
+2. **Pushed to GitHub** - Vault must be hosted on a GitHub remote
+3. **GitHub Personal Access Token** - PAT with `repo` scope (full repository access)
+4. **Sync-enabled** (recommended) - We recommend [obsidian-git](https://github.com/Vinzent03/obsidian-git) plugin for automatic sync
 
 The server will clone your vault, make changes, and push them back. Your Obsidian clients should regularly pull to stay in sync.
-
-**Required GitHub Scopes:** Personal Access Token needs `repo` (all)
 
 ## Installation & Setup
 
@@ -133,12 +128,7 @@ Add to your configuration file:
   "mcpServers": {
     "obsidian": {
       "command": "npm",
-      "args": [
-        "run",
-        "--prefix",
-        "/ABSOLUTE/PATH/TO/obsidian-mcp",
-        "dev"
-      ]
+      "args": ["run", "--prefix", "/ABSOLUTE/PATH/TO/obsidian-mcp", "dev"]
     }
   }
 }
@@ -183,6 +173,63 @@ docker run -p 3000:3000 --rm \
 ```
 
 Environment variables can be configured in your `.env` file (see Installation & Setup above).
+
+## AWS Lambda Deployment
+
+Deploy to AWS Lambda for remote access with OAuth 2.0 authentication and DynamoDB session storage. This is ideal for accessing your vault from ChatGPT, Claude web, or other remote MCP clients.
+
+### Prerequisites
+
+Before deploying to AWS, ensure you have:
+
+- AWS CLI configured with valid credentials
+- AWS CDK installed (`npm install -g aws-cdk`)
+- All environment variables configured in `.env` (including OAuth variables)
+
+### Deployment Steps
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Configure environment variables
+cp .env.example .env
+# Edit .env and fill in all required variables including:
+#   - VAULT_REPO, VAULT_BRANCH, GITHUB_PAT (git access)
+#   - OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, PERSONAL_AUTH_TOKEN (OAuth)
+#   - JOURNAL_* variables (journal configuration)
+
+# 3. Deploy to AWS
+npm run cdk:deploy
+```
+
+### What Gets Deployed
+
+The CDK stack provisions:
+
+- **Lambda Function**: ARM64 function with Docker image build (2GB memory, 10GB ephemeral storage)
+- **DynamoDB Table**: Session storage with TTL-based expiration
+- **Function URL**: Public HTTPS endpoint with CORS enabled
+- **CloudWatch Logs**: Log group with 1-week retention
+
+### Post-Deployment Configuration
+
+After deployment:
+
+1. Note the Lambda Function URL from the deployment output
+2. Update `BASE_URL` in your `.env` file to match the Function URL
+3. Redeploy if you changed the BASE_URL: `npm run cdk:deploy`
+4. Use the Function URL for OAuth registration and MCP client configuration
+
+### Cleanup
+
+To remove all AWS resources:
+
+```bash
+npm run cdk:destroy
+```
+
+**Note**: The DynamoDB session table uses RETAIN removal policy. Manually delete the table from AWS Console after stack destruction if needed.
 
 ## Usage
 
@@ -237,44 +284,44 @@ The journal tool automatically creates/appends to daily journal files with times
 
 ### File Operations (7 tools)
 
-| Tool             | Description                                                                                   |
-| ---------------- | --------------------------------------------------------------------------------------------- |
-| `read-note`      | Read the contents of a note file                                                              |
-| `create-note`    | Create a new note with content                                                                |
-| `edit-note`      | Replace the entire content of a note                                                          |
-| `delete-note`    | Delete a note file                                                                            |
-| `move-note`      | Move or rename a note                                                                         |
-| `append-content` | Append content to an existing or new file                                                     |
-| `patch-content`  | Insert content at a specific location (heading, 1-based line number, block, or frontmatter)  |
+| Tool             | Description                                                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `read-note`      | Read the contents of a note file                                                                                            |
+| `create-note`    | Create a new note with content (automatically creates parent directories if needed)                                         |
+| `edit-note`      | Replace the entire content of an existing note                                                                              |
+| `delete-note`    | Permanently delete a note file from the vault                                                                               |
+| `move-note`      | Move a note to a different directory or rename it                                                                           |
+| `append-content` | Append content to the end of an existing note, or create a new note if it doesn't exist                                     |
+| `patch-content`  | Insert or update content at specific locations: after headings, at line numbers, within code blocks, or in YAML frontmatter |
 
 ### Directory Operations (3 tools)
 
-| Tool                  | Description                        |
-| --------------------- | ---------------------------------- |
-| `create-directory`    | Create a new directory in the vault|
-| `list-files-in-vault` | List all files in the vault root   |
-| `list-files-in-dir`   | List files in a specific directory |
+| Tool                  | Description                                                        |
+| --------------------- | ------------------------------------------------------------------ |
+| `create-directory`    | Create a new directory in the vault (supports nested paths)        |
+| `list-files-in-vault` | List all markdown files and directories in the vault root          |
+| `list-files-in-dir`   | List all files and subdirectories within a specific directory path |
 
 ### Search (1 tool)
 
-| Tool           | Description                                                                    |
-| -------------- | ------------------------------------------------------------------------------ |
-| `search-vault` | Fuzzy or exact search across vault filenames and content with relevance scoring |
+| Tool           | Description                                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `search-vault` | Search vault filenames and content using fuzzy matching (powered by fuse.js) or exact string matching with context lines |
 
 ### Tag Management (4 tools)
 
-| Tool          | Description                                     |
-| ------------- | ----------------------------------------------- |
-| `add-tags`    | Add tags to a note (frontmatter or inline)      |
-| `remove-tags` | Remove tags from a note                         |
-| `rename-tag`  | Rename a tag across all notes in the vault      |
-| `manage-tags` | List, count, or merge tags across the vault     |
+| Tool          | Description                                                                       |
+| ------------- | --------------------------------------------------------------------------------- |
+| `add-tags`    | Add hashtags to a note's YAML frontmatter or inline within the note content       |
+| `remove-tags` | Remove specified hashtags from a note's frontmatter and/or inline content         |
+| `rename-tag`  | Rename a tag across all notes in the vault (updates both frontmatter and inline)  |
+| `manage-tags` | List all tags with usage counts, or merge multiple tags into a single unified tag |
 
 ### Journal Logging (1 tool)
 
-| Tool                | Description                                      |
-| ------------------- | ------------------------------------------------ |
-| `log-journal-entry` | Automatically log work to today's journal entry  |
+| Tool                | Description                                                                                  |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `log-journal-entry` | Log timestamped activity entries to daily journal files (auto-creates journal from template) |
 
 ## Available Resources
 
@@ -287,7 +334,6 @@ MCP resources provide contextual information that LLMs can access on-demand with
 | `vault-readme` | `obsidian://vault-readme` | Provides access to the README.md file from your vault root containing organization guidelines, structure information, and vault-specific conventions |
 
 **Usage**: If your vault contains a README.md file in its root directory, LLMs can access it through this resource to understand how your vault is organized. This helps the LLM make better decisions about where to create files, how to structure notes, and follow your vault's conventions.
-
 
 ## License
 
