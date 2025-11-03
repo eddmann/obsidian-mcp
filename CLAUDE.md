@@ -182,7 +182,7 @@ The server provides 16 tools organized into 5 categories:
 
 **Directory Operations (3 tools)**: create-directory, list-files-in-vault, list-files-in-dir
 
-**Search (1 tool)**: search-vault (regex support, context lines, file type filtering)
+**Search (1 tool)**: search-vault (fuzzy search with fuse.js, optional exact matching, relevance scoring, context lines, file type filtering)
 
 **Tag Management (4 tools)**: add-tags, remove-tags, rename-tag, manage-tags
 

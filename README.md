@@ -12,7 +12,7 @@ This MCP server provides **16 tools** and **1 resource** to interact with your O
 
 - File Operations (7 tools) - Read, create, edit, delete, move, append, and patch notes
 - Directory Operations (3 tools) - Create directories and list files
-- Search (1 tool) - Full-text search with regex support
+- Search (1 tool) - Fuzzy search with fuse.js, optional exact matching, and relevance scoring
 - Tag Management (4 tools) - Add, remove, rename, and manage tags
 - Journal Logging (1 tool) - Auto-log LLM activity to daily journals
 
@@ -322,7 +322,7 @@ The journal tool automatically creates/appends to daily journal files with times
 
 | Tool           | Description                                                                 |
 | -------------- | --------------------------------------------------------------------------- |
-| `search-vault` | Full-text search with regex support, context lines, and file type filtering |
+| `search-vault` | Fuzzy search with fuse.js (optional exact matching), relevance scoring, context lines, and file type filtering |
 
 ### Tag Management (4 tools)
 
