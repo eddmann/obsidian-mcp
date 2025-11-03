@@ -28,6 +28,38 @@ describe('Patch content behaviours', () => {
     expect(updated).toContain('## Target\nInserted under target\nBody line');
   });
 
+  it('returns change preview with context for heading insertion', async () => {
+    const vault = new InMemoryVaultManager({
+      'Notes/preview.md': [
+        '# Title',
+        'Some intro',
+        '',
+        '## Target Section',
+        'Existing content',
+        'More existing',
+        '',
+        '## Next Section',
+        'Other content',
+      ].join('\n'),
+    });
+    harness = new ToolHarness({ vault });
+
+    const result = await harness.invoke('patch-content', {
+      path: 'Notes/preview.md',
+      anchor_type: 'heading',
+      anchor_value: 'Target Section',
+      position: 'after',
+      content: 'New inserted line',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data.change_preview).toBeDefined();
+    expect(result.data.change_preview.line_range).toEqual({ start: 5, end: 5 });
+    expect(result.data.change_preview.changed_content).toEqual(['New inserted line']);
+    expect(result.data.change_preview.context_before).toEqual(['', '## Target Section']);
+    expect(result.data.change_preview.context_after).toEqual(['Existing content', 'More existing']);
+  });
+
   it('replaces a specific line number', async () => {
     const vault = new InMemoryVaultManager({
       'Notes/lines.md': ['First', 'Second', 'Third'].join('\n'),
@@ -46,6 +78,28 @@ describe('Patch content behaviours', () => {
     expect(await harness.vault.readFile('Notes/lines.md')).toBe(
       ['First', 'Replacement', 'Third'].join('\n'),
     );
+  });
+
+  it('returns change preview for line replacement', async () => {
+    const vault = new InMemoryVaultManager({
+      'Notes/lines-preview.md': ['Line 1', 'Line 2', 'Line 3', 'Line 4', 'Line 5'].join('\n'),
+    });
+    harness = new ToolHarness({ vault });
+
+    const result = await harness.invoke('patch-content', {
+      path: 'Notes/lines-preview.md',
+      anchor_type: 'line',
+      anchor_value: '3',
+      position: 'replace',
+      content: 'Replaced line 3',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data.change_preview).toBeDefined();
+    expect(result.data.change_preview.line_range).toEqual({ start: 3, end: 3 });
+    expect(result.data.change_preview.changed_content).toEqual(['Replaced line 3']);
+    expect(result.data.change_preview.context_before).toEqual(['Line 1', 'Line 2']);
+    expect(result.data.change_preview.context_after).toEqual(['Line 4', 'Line 5']);
   });
 
   it('adds content adjacent to a block identifier', async () => {

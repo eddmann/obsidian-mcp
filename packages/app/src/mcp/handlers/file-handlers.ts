@@ -1,6 +1,12 @@
 import { VaultManager } from '@/services/vault-manager';
 import type { ToolResponse, JournalConfig } from './types';
 
+type PatchResult = {
+  content: string;
+  lineRange: { start: number; end: number };
+  changedLines: string[];
+};
+
 export async function handleReadNote(
   vault: VaultManager,
   args: { path: string },
@@ -212,14 +218,19 @@ export async function handlePatchContent(
 
     const currentContent = await getOrInitializeContent(vault, args.path, config);
 
-    let newContent: string;
+    let patchResult: PatchResult;
 
     switch (args.anchor_type) {
       case 'heading':
-        newContent = patchAtHeading(currentContent, args.anchor_value, args.content, args.position);
+        patchResult = patchAtHeading(
+          currentContent,
+          args.anchor_value,
+          args.content,
+          args.position,
+        );
         break;
       case 'line':
-        newContent = patchAtLine(
+        patchResult = patchAtLine(
           currentContent,
           parseInt(args.anchor_value),
           args.content,
@@ -227,20 +238,41 @@ export async function handlePatchContent(
         );
         break;
       case 'block':
-        newContent = patchAtBlock(currentContent, args.anchor_value, args.content, args.position);
+        patchResult = patchAtBlock(currentContent, args.anchor_value, args.content, args.position);
         break;
       case 'frontmatter':
-        newContent = patchFrontmatter(currentContent, args.anchor_value, args.content);
+        patchResult = patchFrontmatter(currentContent, args.anchor_value, args.content);
         break;
       default:
         throw new Error(`Unknown anchor type: ${args.anchor_type}`);
     }
 
-    await vault.writeFile(args.path, newContent);
+    await vault.writeFile(args.path, patchResult.content);
+
+    // Extract context lines for preview
+    const allLines = patchResult.content.split('\n');
+    const contextSize = 2;
+    const startLine = patchResult.lineRange.start;
+    const endLine = patchResult.lineRange.end;
+
+    const contextBefore = allLines.slice(Math.max(0, startLine - 1 - contextSize), startLine - 1);
+    const contextAfter = allLines.slice(endLine, Math.min(allLines.length, endLine + contextSize));
 
     return {
       success: true,
-      data: { success: true, path: args.path },
+      data: {
+        success: true,
+        path: args.path,
+        change_preview: {
+          line_range: {
+            start: startLine,
+            end: endLine,
+          },
+          context_before: contextBefore,
+          changed_content: patchResult.changedLines,
+          context_after: contextAfter,
+        },
+      },
       metadata: {
         timestamp: new Date().toISOString(),
         affected_files: [args.path],
@@ -260,7 +292,7 @@ function patchAtHeading(
   heading: string,
   newContent: string,
   position: 'before' | 'after' | 'replace',
-): string {
+): PatchResult {
   const lines = content.split('\n');
   const headingRegex = new RegExp(`^#+\\s+${escapeRegExp(heading)}\\s*$`, 'i');
 
@@ -276,10 +308,18 @@ function patchAtHeading(
         processedContent = contentLines.slice(1).join('\n');
       }
 
+      const insertedLines = processedContent.split('\n');
+      let startLine: number;
+      let endLine: number;
+
       if (position === 'before') {
         lines.splice(i, 0, processedContent);
+        startLine = i + 1; // 1-based
+        endLine = i + insertedLines.length;
       } else if (position === 'after') {
         lines.splice(i + 1, 0, processedContent);
+        startLine = i + 2; // 1-based
+        endLine = i + 1 + insertedLines.length;
       } else {
         // replace: remove content under the heading and replace with new content
         let endIndex = i + 1;
@@ -287,8 +327,15 @@ function patchAtHeading(
           endIndex++;
         }
         lines.splice(i + 1, endIndex - i - 1, processedContent);
+        startLine = i + 2; // 1-based, line after heading
+        endLine = i + 1 + insertedLines.length;
       }
-      return lines.join('\n');
+
+      return {
+        content: lines.join('\n'),
+        lineRange: { start: startLine, end: endLine },
+        changedLines: insertedLines,
+      };
     }
   }
 
@@ -300,7 +347,7 @@ function patchAtLine(
   lineNumber: number,
   newContent: string,
   position: 'before' | 'after' | 'replace',
-): string {
+): PatchResult {
   const lines = content.split('\n');
 
   if (!Number.isInteger(lineNumber) || isNaN(lineNumber)) {
@@ -312,16 +359,29 @@ function patchAtLine(
   }
 
   const index = lineNumber - 1;
+  const insertedLines = newContent.split('\n');
+  let startLine: number;
+  let endLine: number;
 
   if (position === 'before') {
     lines.splice(index, 0, newContent);
+    startLine = lineNumber;
+    endLine = lineNumber + insertedLines.length - 1;
   } else if (position === 'after') {
     lines.splice(index + 1, 0, newContent);
+    startLine = lineNumber + 1;
+    endLine = lineNumber + insertedLines.length;
   } else {
     lines[index] = newContent;
+    startLine = lineNumber;
+    endLine = lineNumber + insertedLines.length - 1;
   }
 
-  return lines.join('\n');
+  return {
+    content: lines.join('\n'),
+    lineRange: { start: startLine, end: endLine },
+    changedLines: insertedLines,
+  };
 }
 
 function patchAtBlock(
@@ -329,28 +389,46 @@ function patchAtBlock(
   blockId: string,
   newContent: string,
   position: 'before' | 'after' | 'replace',
-): string {
+): PatchResult {
   const lines = content.split('\n');
   const blockRegex = new RegExp(`\\^${escapeRegExp(blockId)}\\s*$`);
 
   for (let i = 0; i < lines.length; i++) {
     if (blockRegex.test(lines[i])) {
+      const insertedLines = newContent.split('\n');
+      let startLine: number;
+      let endLine: number;
+
       if (position === 'before') {
         lines.splice(i, 0, newContent);
+        startLine = i + 1; // 1-based
+        endLine = i + insertedLines.length;
       } else if (position === 'after') {
         lines.splice(i + 1, 0, newContent);
+        startLine = i + 2; // 1-based
+        endLine = i + 1 + insertedLines.length;
       } else {
         lines[i] = newContent;
+        startLine = i + 1; // 1-based
+        endLine = i + insertedLines.length;
       }
-      return lines.join('\n');
+
+      return {
+        content: lines.join('\n'),
+        lineRange: { start: startLine, end: endLine },
+        changedLines: insertedLines,
+      };
     }
   }
 
   throw new Error(`Block ID ^${blockId} not found`);
 }
 
-function patchFrontmatter(content: string, key: string, value: string): string {
+function patchFrontmatter(content: string, key: string, value: string): PatchResult {
   const lines = content.split('\n');
+  const newLine = `${key}: ${value}`;
+  let startLine: number;
+  let endLine: number;
 
   if (lines[0] === '---') {
     let endIndex = 1;
@@ -361,17 +439,33 @@ function patchFrontmatter(content: string, key: string, value: string): string {
     const keyRegex = new RegExp(`^${escapeRegExp(key)}:\\s*`);
     for (let i = 1; i < endIndex; i++) {
       if (keyRegex.test(lines[i])) {
-        lines[i] = `${key}: ${value}`;
-        return lines.join('\n');
+        lines[i] = newLine;
+        startLine = i + 1; // 1-based
+        endLine = i + 1;
+        return {
+          content: lines.join('\n'),
+          lineRange: { start: startLine, end: endLine },
+          changedLines: [newLine],
+        };
       }
     }
 
-    lines.splice(endIndex, 0, `${key}: ${value}`);
+    // Key doesn't exist, add it before the closing ---
+    lines.splice(endIndex, 0, newLine);
+    startLine = endIndex + 1; // 1-based
+    endLine = endIndex + 1;
   } else {
-    lines.unshift('---', `${key}: ${value}`, '---', '');
+    // No frontmatter exists, create it
+    lines.unshift('---', newLine, '---', '');
+    startLine = 2; // 1-based, the key line
+    endLine = 2;
   }
 
-  return lines.join('\n');
+  return {
+    content: lines.join('\n'),
+    lineRange: { start: startLine, end: endLine },
+    changedLines: [newLine],
+  };
 }
 
 function escapeRegExp(string: string): string {
