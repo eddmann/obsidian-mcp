@@ -82,8 +82,16 @@ export function getLogger(): Logger {
 
 // Convenience export
 export const logger = {
-  get debug() { return getLogger().debug.bind(getLogger()); },
-  get info() { return getLogger().info.bind(getLogger()); },
-  get warn() { return getLogger().warn.bind(getLogger()); },
-  get error() { return getLogger().error.bind(getLogger()); },
+  get debug() {
+    return getLogger().debug.bind(getLogger());
+  },
+  get info() {
+    return getLogger().info.bind(getLogger());
+  },
+  get warn() {
+    return getLogger().warn.bind(getLogger());
+  },
+  get error() {
+    return getLogger().error.bind(getLogger());
+  },
 };

@@ -320,8 +320,8 @@ The journal tool automatically creates/appends to daily journal files with times
 
 ### Search (1 tool)
 
-| Tool           | Description                                                                 |
-| -------------- | --------------------------------------------------------------------------- |
+| Tool           | Description                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
 | `search-vault` | Fuzzy search with fuse.js (optional exact matching), relevance scoring, context lines, and file type filtering |
 
 ### Tag Management (4 tools)
