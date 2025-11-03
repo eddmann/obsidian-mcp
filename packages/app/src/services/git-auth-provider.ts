@@ -18,7 +18,7 @@ function detectProvider(repoUrl: string): GitProvider {
     }
 
     return 'generic';
-  } catch (error) {
+  } catch {
     throw new Error(`Invalid repository URL: ${repoUrl}`);
   }
 }

@@ -3,7 +3,7 @@ const eslintConfigPrettier = require('eslint-config-prettier');
 
 module.exports = tseslint.config(
   {
-    ignores: ['node_modules', 'dist', 'cdk.out', '.cdk.staging', 'coverage', '*.d.ts'],
+    ignores: ['node_modules', 'dist', '**/cdk.out/**', '.cdk.staging', 'coverage', '*.d.ts'],
   },
   ...tseslint.configs.recommended,
   eslintConfigPrettier,
