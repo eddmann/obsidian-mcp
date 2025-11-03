@@ -51,6 +51,27 @@ export function registerTools(server: McpServer, getVaultManager: () => VaultMan
   );
 
   server.registerTool(
+    'read-notes',
+    {
+      title: 'Read Notes',
+      description: 'Read multiple notes in a single request for improved efficiency',
+      inputSchema: toolDefs.ReadNotesSchema.inputSchema,
+      outputSchema: toolDefs.ReadNotesSchema.outputSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true, // Interacts with git-backed vault
+      },
+    },
+    async args => {
+      const vault = getVaultManager();
+      const result = await handlers.handleReadNotes(vault, args);
+      return formatToolResult(result);
+    },
+  );
+
+  server.registerTool(
     'create-note',
     {
       title: 'Create Note',

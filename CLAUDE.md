@@ -94,7 +94,7 @@ npm run cdk:destroy
 
 ### Key Files
 
-**MCP Tool Registration**: `packages/app/src/mcp/tool-registrations.ts` - Registers all 16 MCP tools with the server. Each tool is annotated with hints (readOnlyHint, destructiveHint, idempotentHint, openWorldHint).
+**MCP Tool Registration**: `packages/app/src/mcp/tool-registrations.ts` - Registers all 17 MCP tools with the server. Each tool is annotated with hints (readOnlyHint, destructiveHint, idempotentHint, openWorldHint).
 
 **Tool Definitions**: `packages/app/src/mcp/tool-definitions.ts` - Zod schemas for input/output validation of all tools.
 
@@ -176,9 +176,9 @@ Optional:
 
 ## Tool Categories
 
-The server provides 16 tools organized into 5 categories:
+The server provides 17 tools organized into 5 categories:
 
-**File Operations (7 tools)**: read-note, create-note, edit-note, delete-note, move-note, append-content, patch-content
+**File Operations (8 tools)**: read-note, read-notes, create-note, edit-note, delete-note, move-note, append-content, patch-content
 
 **Directory Operations (3 tools)**: create-directory, list-files-in-vault, list-files-in-dir
 

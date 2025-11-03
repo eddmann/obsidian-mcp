@@ -6,11 +6,11 @@ A Model Context Protocol (MCP) server for git-backed Obsidian vaults. Access and
 
 ## Overview
 
-This MCP server provides **16 tools** and **1 resource** to interact with your Obsidian vault:
+This MCP server provides **17 tools** and **1 resource** to interact with your Obsidian vault:
 
 **Tools** (organized into 5 categories):
 
-- File Operations (7) - Read, create, edit, delete, move, append, and patch notes
+- File Operations (8) - Read, create, edit, delete, move, append, and patch notes
 - Directory Operations (3) - Create directories and list files
 - Search - Fuzzy search with fuse.js, optional exact matching, and relevance scoring
 - Tag Management (4) - Add, remove, rename, and manage tags
@@ -239,6 +239,7 @@ Ask your LLM to interact with your Obsidian vault using natural language.
 
 ```
 "Can you read my project note at Projects/MCP-Server.md?"
+"Read all my daily notes from the past week"
 "Create a new meeting note in Work/Meetings for today's standup"
 "Add a task list to my project plan under the Action Items section"
 ```
@@ -277,11 +278,12 @@ Ask your LLM to interact with your Obsidian vault using natural language.
 
 ## Available Tools
 
-### File Operations (7 tools)
+### File Operations (8 tools)
 
 | Tool             | Description                                                                                                                 |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `read-note`      | Read the contents of a note file                                                                                            |
+| `read-notes`     | Read multiple notes in a single request for improved efficiency (accepts array of paths, handles partial success)           |
 | `create-note`    | Create a new note with content (automatically creates parent directories if needed)                                         |
 | `edit-note`      | Replace the entire content of an existing note                                                                              |
 | `delete-note`    | Permanently delete a note file from the vault                                                                               |

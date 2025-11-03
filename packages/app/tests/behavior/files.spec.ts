@@ -304,3 +304,183 @@ describe('File tool behaviours', () => {
     expect(await harness.vault.readFile('My Notes/File with spaces.md')).toBe('Content');
   });
 });
+
+describe('Bulk read-notes tool behaviours', () => {
+  it('reads multiple notes successfully', async () => {
+    const vault = new InMemoryVaultManager({
+      'Notes/first.md': '# First note',
+      'Notes/second.md': '# Second note',
+      'Notes/third.md': '# Third note',
+    });
+    harness = new ToolHarness({ vault });
+
+    const { success, data } = await harness.invoke('read-notes', {
+      paths: ['Notes/first.md', 'Notes/second.md', 'Notes/third.md'],
+    });
+
+    expect(success).toBe(true);
+    expect(data.total_requested).toBe(3);
+    expect(data.total_success).toBe(3);
+    expect(data.total_failed).toBe(0);
+    expect(data.notes).toHaveLength(3);
+    expect(data.notes[0]).toEqual({
+      path: 'Notes/first.md',
+      content: '# First note',
+      success: true,
+    });
+    expect(data.notes[1]).toEqual({
+      path: 'Notes/second.md',
+      content: '# Second note',
+      success: true,
+    });
+    expect(data.notes[2]).toEqual({
+      path: 'Notes/third.md',
+      content: '# Third note',
+      success: true,
+    });
+  });
+
+  it('handles partial success when some files are missing', async () => {
+    const vault = new InMemoryVaultManager({
+      'Notes/exists.md': 'Existing content',
+    });
+    harness = new ToolHarness({ vault });
+
+    const { success, data } = await harness.invoke('read-notes', {
+      paths: ['Notes/exists.md', 'Notes/missing.md', 'Notes/also-missing.md'],
+    });
+
+    expect(success).toBe(true);
+    expect(data.total_requested).toBe(3);
+    expect(data.total_success).toBe(1);
+    expect(data.total_failed).toBe(2);
+    expect(data.notes[0]).toEqual({
+      path: 'Notes/exists.md',
+      content: 'Existing content',
+      success: true,
+    });
+    expect(data.notes[1].success).toBe(false);
+    expect(data.notes[1].error).toBeDefined();
+    expect(data.notes[2].success).toBe(false);
+    expect(data.notes[2].error).toBeDefined();
+  });
+
+  it('reads single note via bulk operation', async () => {
+    const vault = new InMemoryVaultManager({ 'Note.md': 'Solo content' });
+    harness = new ToolHarness({ vault });
+
+    const { success, data } = await harness.invoke('read-notes', {
+      paths: ['Note.md'],
+    });
+
+    expect(success).toBe(true);
+    expect(data.total_requested).toBe(1);
+    expect(data.total_success).toBe(1);
+    expect(data.total_failed).toBe(0);
+    expect(data.notes[0]).toEqual({
+      path: 'Note.md',
+      content: 'Solo content',
+      success: true,
+    });
+  });
+
+  it('handles empty files in bulk read', async () => {
+    const vault = new InMemoryVaultManager({
+      'Empty.md': '',
+      'NotEmpty.md': 'Content',
+    });
+    harness = new ToolHarness({ vault });
+
+    const { success, data } = await harness.invoke('read-notes', {
+      paths: ['Empty.md', 'NotEmpty.md'],
+    });
+
+    expect(success).toBe(true);
+    expect(data.total_success).toBe(2);
+    expect(data.notes[0]).toEqual({
+      path: 'Empty.md',
+      content: '',
+      success: true,
+    });
+    expect(data.notes[1]).toEqual({
+      path: 'NotEmpty.md',
+      content: 'Content',
+      success: true,
+    });
+  });
+
+  it('reads many notes efficiently', async () => {
+    const files = Array.from({ length: 20 }, (_, i) => ({
+      path: `Notes/note-${i}.md`,
+      content: `Content ${i}`,
+    }));
+    const vault = new InMemoryVaultManager(Object.fromEntries(files.map(f => [f.path, f.content])));
+    harness = new ToolHarness({ vault });
+
+    const { success, data } = await harness.invoke('read-notes', {
+      paths: files.map(f => f.path),
+    });
+
+    expect(success).toBe(true);
+    expect(data.total_requested).toBe(20);
+    expect(data.total_success).toBe(20);
+    expect(data.total_failed).toBe(0);
+    expect(data.notes).toHaveLength(20);
+    data.notes.forEach((note, i) => {
+      expect(note.path).toBe(`Notes/note-${i}.md`);
+      expect(note.content).toBe(`Content ${i}`);
+      expect(note.success).toBe(true);
+    });
+  });
+
+  it('handles all missing files gracefully', async () => {
+    harness = new ToolHarness();
+
+    const { success, data } = await harness.invoke('read-notes', {
+      paths: ['Missing1.md', 'Missing2.md'],
+    });
+
+    expect(success).toBe(true);
+    expect(data.total_requested).toBe(2);
+    expect(data.total_success).toBe(0);
+    expect(data.total_failed).toBe(2);
+    expect(data.notes.every(n => !n.success)).toBe(true);
+  });
+
+  it('preserves order of requested paths', async () => {
+    const vault = new InMemoryVaultManager({
+      'A.md': 'Content A',
+      'B.md': 'Content B',
+      'C.md': 'Content C',
+    });
+    harness = new ToolHarness({ vault });
+
+    const { success, data } = await harness.invoke('read-notes', {
+      paths: ['C.md', 'A.md', 'B.md'],
+    });
+
+    expect(success).toBe(true);
+    expect(data.notes[0].path).toBe('C.md');
+    expect(data.notes[1].path).toBe('A.md');
+    expect(data.notes[2].path).toBe('B.md');
+  });
+
+  it('handles duplicate paths in request', async () => {
+    const vault = new InMemoryVaultManager({ 'Note.md': 'Content' });
+    harness = new ToolHarness({ vault });
+
+    const { success, data } = await harness.invoke('read-notes', {
+      paths: ['Note.md', 'Note.md', 'Note.md'],
+    });
+
+    expect(success).toBe(true);
+    expect(data.total_requested).toBe(3);
+    expect(data.total_success).toBe(3);
+    expect(data.notes).toHaveLength(3);
+    data.notes.forEach(note => {
+      expect(note.path).toBe('Note.md');
+      expect(note.content).toBe('Content');
+      expect(note.success).toBe(true);
+    });
+  });
+});

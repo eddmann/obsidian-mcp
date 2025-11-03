@@ -28,6 +28,52 @@ export async function handleReadNote(
   }
 }
 
+export async function handleReadNotes(
+  vault: VaultManager,
+  args: { paths: string[] },
+): Promise<ToolResponse> {
+  try {
+    const notes = await Promise.all(
+      args.paths.map(async path => {
+        try {
+          const content = await vault.readFile(path);
+          return {
+            path,
+            content,
+            success: true,
+          };
+        } catch (error: any) {
+          return {
+            path,
+            success: false,
+            error: error.message,
+          };
+        }
+      }),
+    );
+
+    const totalSuccess = notes.filter(n => n.success).length;
+    const totalFailed = notes.filter(n => !n.success).length;
+
+    return {
+      success: true,
+      data: {
+        notes,
+        total_requested: args.paths.length,
+        total_success: totalSuccess,
+        total_failed: totalFailed,
+      },
+      metadata: { timestamp: new Date().toISOString() },
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message,
+      metadata: { timestamp: new Date().toISOString() },
+    };
+  }
+}
+
 export async function handleCreateNote(
   vault: VaultManager,
   args: { path: string; content: string; overwrite?: boolean },

@@ -10,6 +10,29 @@ export const ReadNoteSchema = {
   },
 };
 
+export const ReadNotesSchema = {
+  inputSchema: {
+    paths: z
+      .array(z.string())
+      .min(1)
+      .max(50)
+      .describe('Array of note paths to read (maximum 50 paths)'),
+  },
+  outputSchema: {
+    notes: z.array(
+      z.object({
+        path: z.string(),
+        content: z.string().optional(),
+        success: z.boolean(),
+        error: z.string().optional(),
+      }),
+    ),
+    total_requested: z.number(),
+    total_success: z.number(),
+    total_failed: z.number(),
+  },
+};
+
 export const CreateNoteSchema = {
   inputSchema: {
     path: z.string().describe('Path for the new note'),
