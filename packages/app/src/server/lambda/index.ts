@@ -20,6 +20,7 @@ import { MCP_SERVER_INSTRUCTIONS } from '@/server/shared/instructions';
 import { configureLogger, logger } from '@/utils/logger';
 import express from 'express';
 import serverless from 'serverless-http';
+import crypto from 'crypto';
 
 configureLogger({
   stream: process.stdout,
@@ -105,12 +106,34 @@ app.use((req, _res, next) => {
     logColdStartConfig();
   }
 
+  // Skip logging health checks
+  if (req.path === '/health') {
+    return next();
+  }
+
+  const requestId = (req.headers['x-request-id'] as string) || crypto.randomUUID();
+  const startTime = Date.now();
+
   logger.info('Lambda invoked', {
+    requestId,
     startType,
     invocation: getInvocationCount(),
     path: req.path,
     method: req.method,
-    oauth: 'enabled',
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+    hasAuth: !!req.headers.authorization,
+  });
+
+  // Log response time on finish
+  _res.on('finish', () => {
+    logger.info('Lambda request completed', {
+      requestId,
+      path: req.path,
+      method: req.method,
+      statusCode: _res.statusCode,
+      durationMs: Date.now() - startTime,
+    });
   });
 
   if (getInvocationCount() === 1) {

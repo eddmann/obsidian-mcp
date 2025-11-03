@@ -62,6 +62,10 @@ export function registerMcpRoute(app: Express, mcpServer: McpServer): void {
   });
 
   const mcpHandler = async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    const method = req.body?.method || 'unknown';
+    const requestId = req.body?.id;
+
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
@@ -72,10 +76,27 @@ export function registerMcpRoute(app: Express, mcpServer: McpServer): void {
     });
 
     try {
+      logger.debug('MCP request received', {
+        method,
+        requestId,
+      });
+
       await mcpServer.connect(transport);
       await transport.handleRequest(req, res, req.body);
+
+      logger.info('MCP request completed', {
+        method,
+        requestId,
+        durationMs: Date.now() - startTime,
+        success: true,
+      });
     } catch (error) {
-      logger.error('Error handling MCP request', { error });
+      logger.error('Error handling MCP request', {
+        error,
+        method,
+        requestId,
+        durationMs: Date.now() - startTime,
+      });
       if (!res.headersSent) {
         res.status(500).json({
           jsonrpc: '2.0',

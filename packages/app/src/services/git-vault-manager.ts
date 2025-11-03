@@ -37,6 +37,20 @@ export class GitVaultManager implements VaultManager {
   }
 
   /**
+   * Sanitize URL for logging (remove credentials)
+   */
+  private sanitizeUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      parsed.username = parsed.username ? '***' : '';
+      parsed.password = '';
+      return parsed.toString();
+    } catch {
+      return 'invalid-url';
+    }
+  }
+
+  /**
    * Initialize the vault (clone or sync on every invocation)
    * - Cold start: Clone the repo if it doesn't exist
    * - Warm start: Sync with remote on every request
@@ -45,10 +59,13 @@ export class GitVaultManager implements VaultManager {
     const vaultExists = existsSync(this.config.vaultPath);
 
     if (!vaultExists) {
-      logger.info(`Cloning vault from ${this.config.repoUrl}...`);
+      logger.info('Cloning vault', {
+        repoUrl: this.sanitizeUrl(this.config.repoUrl),
+        branch: this.config.branch,
+      });
       await this.cloneVault();
     } else {
-      logger.info('Vault exists, syncing with remote...');
+      logger.debug('Vault exists, syncing with remote');
       await this.syncVault();
     }
   }
@@ -58,7 +75,7 @@ export class GitVaultManager implements VaultManager {
    */
   private async removeVault(): Promise<void> {
     if (existsSync(this.config.vaultPath)) {
-      logger.info('Removing vault directory for fresh clone...');
+      logger.debug('Removing vault directory for fresh clone');
       await fs.rm(this.config.vaultPath, { recursive: true, force: true });
     }
   }
@@ -85,6 +102,7 @@ export class GitVaultManager implements VaultManager {
    * Sync vault with remote (warm start)
    */
   private async syncVault(): Promise<void> {
+    const startTime = Date.now();
     const vaultGit = this.createGitInstance(this.config.vaultPath);
     const authUrl = this.getAuthenticatedUrl();
 
@@ -93,7 +111,7 @@ export class GitVaultManager implements VaultManager {
       await vaultGit.remote(['set-url', 'origin', authUrl]);
 
       // Fetch latest remote state with timeout
-      logger.info('Fetching latest changes from remote...');
+      logger.debug('Fetching latest changes from remote');
       await Promise.race([
         vaultGit.fetch('origin', this.config.branch),
         new Promise<void>((_, reject) =>
@@ -102,15 +120,22 @@ export class GitVaultManager implements VaultManager {
       ]);
 
       // Reset to clean "as cloned" state - matches remote exactly
-      logger.info('Resetting vault to clean state...');
+      logger.debug('Resetting vault to clean state');
       await vaultGit.reset(['--hard', `origin/${this.config.branch}`]);
 
       // Remove untracked files and directories (-f = force, -d = directories, -x = ignored files)
       await vaultGit.clean('fdx');
 
-      logger.info('Vault synced with remote');
+      logger.info('Vault synced with remote', {
+        durationMs: Date.now() - startTime,
+        branch: this.config.branch,
+      });
     } catch (error) {
-      logger.error('Sync failed, removing vault and performing fresh clone', { error });
+      logger.error('Sync failed, removing vault and performing fresh clone', {
+        error,
+        durationMs: Date.now() - startTime,
+        branch: this.config.branch,
+      });
       await this.removeVault();
       await this.cloneVault();
     }
@@ -143,6 +168,7 @@ export class GitVaultManager implements VaultManager {
    * Push with exponential backoff retry
    */
   private async pushWithRetry(vaultGit: SimpleGit, maxAttempts: number): Promise<void> {
+    const startTime = Date.now();
     const authUrl = this.getAuthenticatedUrl();
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -150,7 +176,11 @@ export class GitVaultManager implements VaultManager {
         // Ensure remote URL has credentials before pushing
         await vaultGit.remote(['set-url', 'origin', authUrl]);
         await vaultGit.push('origin', this.config.branch);
-        logger.info('Successfully pushed changes');
+        logger.info('Successfully pushed changes', {
+          durationMs: Date.now() - startTime,
+          attempts: attempt,
+          branch: this.config.branch,
+        });
         return;
       } catch (error) {
         if (attempt === maxAttempts) {
@@ -158,7 +188,12 @@ export class GitVaultManager implements VaultManager {
         }
 
         const delay = Math.pow(2, attempt) * 1000;
-        logger.warn(`Push attempt ${attempt} failed, retrying in ${delay}ms...`, { attempt, delay });
+        logger.warn('Push attempt failed, retrying', {
+          attempt,
+          maxAttempts,
+          delayMs: delay,
+          error,
+        });
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -191,6 +226,11 @@ export class GitVaultManager implements VaultManager {
 
     await fs.writeFile(fullPath, content, 'utf-8');
     await this.commitAndPush(`Update file: ${relativePath}`, [relativePath]);
+
+    logger.debug('File written successfully', {
+      path: relativePath,
+      sizeBytes: content.length,
+    });
   }
 
   /**
@@ -209,6 +249,10 @@ export class GitVaultManager implements VaultManager {
 
       await fs.unlink(fullPath);
       await this.commitAndPush(`Delete file: ${relativePath}`, [relativePath]);
+
+      logger.debug('File deleted successfully', {
+        path: relativePath,
+      });
     } catch (error: any) {
       throw new Error(`Failed to delete file ${relativePath}: ${error.message}`);
     }

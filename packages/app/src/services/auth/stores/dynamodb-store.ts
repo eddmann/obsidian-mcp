@@ -72,7 +72,11 @@ export class DynamoDbAuthStore implements AuthStore {
 
       return session;
     } catch (error) {
-      logger.error('DynamoDB error getting session', { error });
+      logger.error('DynamoDB error getting session', {
+        error,
+        sessionId,
+        tableName: this.tableName,
+      });
       throw error;
     }
   }
@@ -98,7 +102,12 @@ export class DynamoDbAuthStore implements AuthStore {
         }),
       );
     } catch (error) {
-      logger.error('DynamoDB error setting session', { error });
+      logger.error('DynamoDB error setting session', {
+        error,
+        sessionId: session.sessionId,
+        tableName: this.tableName,
+        expiresAt: session.expiresAt,
+      });
       throw error;
     }
   }
@@ -280,6 +289,7 @@ export function createDynamoDbAuthStore(options: DynamoDbAuthStoreOptions): Auth
     tableName: options.tableName,
     region: options.region,
     ttlAttribute: options.ttlAttribute || 'ttl',
+    hasCustomClient: !!options.client,
   });
   return new DynamoDbAuthStore(options);
 }

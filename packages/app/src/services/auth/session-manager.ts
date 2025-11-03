@@ -26,6 +26,11 @@ export async function createSession(): Promise<string> {
     const store = getAuthStore();
     await store.setSession(session);
 
+    logger.debug('Session created', {
+      sessionId,
+      expiresAt: session.expiresAt,
+    });
+
     return sessionId;
   } catch (error) {
     logger.error('Error creating session', { error });
@@ -95,6 +100,14 @@ export async function authenticateSession(
     };
     const store = getAuthStore();
     await store.setSession(updatedSession);
+
+    logger.info('Session authenticated successfully', {
+      sessionId,
+    });
+  } else {
+    logger.warn('Session authentication failed', {
+      sessionId,
+    });
   }
 
   return isValid;
