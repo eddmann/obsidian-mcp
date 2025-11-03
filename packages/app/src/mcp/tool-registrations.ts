@@ -254,7 +254,8 @@ export function registerTools(server: McpServer, getVaultManager: () => VaultMan
     'search-vault',
     {
       title: 'Search Vault',
-      description: 'Full-text search across the vault with context',
+      description:
+        'Fuzzy or exact search across vault filenames and content with relevance scoring',
       inputSchema: toolDefs.SearchVaultSchema.inputSchema,
       outputSchema: toolDefs.SearchVaultSchema.outputSchema,
       annotations: {

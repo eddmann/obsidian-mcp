@@ -153,32 +153,38 @@ export const ListFilesInDirSchema = {
 export const SearchVaultSchema = {
   inputSchema: {
     query: z.string().describe('Search query string'),
-    case_sensitive: z.boolean().optional().describe('Case-sensitive search (default: false)'),
-    regex: z.boolean().optional().describe('Treat query as regex (default: false)'),
-    path_filter: z.string().optional().describe('Filter results by path pattern'),
-    file_types: z.array(z.string()).optional().describe('Filter by file extensions'),
-    limit: z.number().optional().describe('Maximum number of results (default: 50)'),
-    include_content: z
+    exact: z
       .boolean()
       .optional()
-      .describe('Include matching line content (default: true)'),
-    context_lines: z
-      .number()
+      .describe('Use exact substring matching instead of fuzzy search (default: false)'),
+    path_filter: z.string().optional().describe('Filter results by path pattern'),
+    file_types: z
+      .array(z.string())
       .optional()
-      .describe('Number of context lines to include (default: 2)'),
+      .describe('Filter by file extensions (default: ["md"])'),
+    limit: z.number().optional().describe('Maximum number of results (default: 50)'),
   },
   outputSchema: {
     results: z.array(
       z.object({
         path: z.string(),
-        matches: z.array(
-          z.object({
-            line: z.number(),
-            content: z.string().optional(),
-            context_before: z.array(z.string()).optional(),
-            context_after: z.array(z.string()).optional(),
-          }),
-        ),
+        match_type: z.enum(['filename', 'content']).describe('Type of match found'),
+        relevance_score: z
+          .number()
+          .min(1)
+          .max(4)
+          .describe('Match quality: 1=excellent, 2=good, 3=fair, 4=poor'),
+        matches: z
+          .array(
+            z.object({
+              line: z.number(),
+              content: z.string(),
+              context_before: z.array(z.string()),
+              context_after: z.array(z.string()),
+            }),
+          )
+          .optional()
+          .describe('Line matches (only present for content matches)'),
       }),
     ),
     total_matches: z.number(),
