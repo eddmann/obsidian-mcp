@@ -6,7 +6,7 @@ import { dirname, join } from 'path';
 export const CORE_ENV_VARS = [
   'VAULT_REPO',
   'VAULT_BRANCH',
-  'GITHUB_PAT',
+  'GIT_TOKEN',
   'JOURNAL_PATH_TEMPLATE',
   'JOURNAL_DATE_FORMAT',
   'JOURNAL_ACTIVITY_SECTION',

@@ -14,7 +14,7 @@ const REPO_ROOT = join(__dirname, '..', '..', '..');
 const REQUIRED_LAMBDA_ENV_VARS = [
   'VAULT_REPO',
   'VAULT_BRANCH',
-  'GITHUB_PAT',
+  'GIT_TOKEN',
   'JOURNAL_PATH_TEMPLATE',
   'JOURNAL_DATE_FORMAT',
   'JOURNAL_ACTIVITY_SECTION',
@@ -25,15 +25,19 @@ const REQUIRED_LAMBDA_ENV_VARS = [
   'BASE_URL',
 ] as const;
 
+const OPTIONAL_LAMBDA_ENV_VARS = ['GIT_USERNAME'] as const;
+
 export class ObsidianMcpStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     const resolvedEnv = this.resolveRequiredEnv();
+    const optionalEnv = this.resolveOptionalEnv();
 
     const baseEnvironment: Record<string, string> = {
       NODE_ENV: process.env.NODE_ENV ?? 'production',
       ...resolvedEnv,
+      ...optionalEnv,
       SESSION_EXPIRY_MS: process.env.SESSION_EXPIRY_MS ?? `${24 * 60 * 60 * 1000}`,
     };
 
@@ -124,6 +128,22 @@ export class ObsidianMcpStack extends cdk.Stack {
 
       return [key, String(value)];
     });
+
+    return Object.fromEntries(entries) as Record<string, string>;
+  }
+
+  private resolveOptionalEnv(): Record<string, string> {
+    const entries = OPTIONAL_LAMBDA_ENV_VARS.map(key => {
+      const contextValue = this.node.tryGetContext(key) as string | undefined;
+      const envValue = process.env[key];
+      const value = contextValue ?? envValue;
+
+      if (value) {
+        return [key, String(value)];
+      }
+
+      return null;
+    }).filter((entry): entry is [string, string] => entry !== null);
 
     return Object.fromEntries(entries) as Record<string, string>;
   }

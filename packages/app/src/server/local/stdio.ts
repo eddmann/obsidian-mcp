@@ -39,7 +39,8 @@ const LOCAL_VAULT_PATH = process.env.LOCAL_VAULT_PATH || './vault-local';
 const vaultManager = new GitVaultManager({
   repoUrl: process.env.VAULT_REPO!,
   branch: process.env.VAULT_BRANCH!,
-  githubPat: process.env.GITHUB_PAT!,
+  gitToken: process.env.GIT_TOKEN!,
+  gitUsername: process.env.GIT_USERNAME,
   vaultPath: LOCAL_VAULT_PATH,
 });
 

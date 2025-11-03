@@ -61,7 +61,7 @@ tags: [journal]
       PERSONAL_AUTH_TOKEN: 'token',
       VAULT_REPO: 'https://example.com/repo.git',
       VAULT_BRANCH: 'main',
-      GITHUB_PAT: 'ghp_token',
+      GIT_TOKEN: 'test_token',
       ...options.env,
     });
 

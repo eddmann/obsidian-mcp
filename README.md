@@ -47,11 +47,47 @@ This enables LLM access to your vault without Obsidian being open, and keeps all
 **Vault Requirements:**
 
 1. Git-initialized Obsidian vault - Your vault must be a git repository
-2. Pushed to GitHub - Vault must be hosted on a GitHub remote
-3. GitHub Personal Access Token - PAT with `repo` scope (full repository access)
+2. Pushed to a git remote - Supports GitHub, GitLab, Bitbucket, or self-hosted git providers
+3. Git Personal Access Token - See [Supported Git Providers](#supported-git-providers) section below
 4. Sync-enabled (recommended) - We recommend [obsidian-git](https://github.com/Vinzent03/obsidian-git) plugin for automatic sync
 
 The server will clone your vault, make changes, and push them back. Your Obsidian clients should regularly pull to stay in sync.
+
+## Supported Git Providers
+
+The server automatically detects your git provider from the repository URL and uses the appropriate authentication method:
+
+### GitHub
+
+- Token Type: Personal Access Token (PAT)
+- Required Scopes: `repo` (full repository access)
+- Example URL: `https://github.com/username/vault-repo.git`
+- Setup: [Create a PAT](https://github.com/settings/tokens) with `repo` scope
+
+### GitLab
+
+- Token Type: Personal Access Token (PAT)
+- Required Scopes: `api` (grants complete read/write access)
+- Example URL: `https://gitlab.com/username/vault-repo.git`
+- Setup: [Create a PAT](https://gitlab.com/-/profile/personal_access_tokens) with `api` scope
+- Note: Also works with self-hosted GitLab instances (e.g., `https://gitlab.company.com/repo.git`)
+
+### Bitbucket
+
+- Token Type: App Password
+- Required Permissions: Repository read and write
+- Example URL: `https://bitbucket.org/username/vault-repo.git`
+- Setup: [Create an App Password](https://bitbucket.org/account/settings/app-passwords/) with repository read/write permissions
+
+### Self-Hosted / Generic
+
+- Token Type: Personal Access Token or password
+- Required Config: Both `GIT_TOKEN` and `GIT_USERNAME` environment variables
+- Example Providers: Gitea, Gogs, custom git servers
+- Example URL: `https://git.mycompany.com/repo.git`
+- Setup: Consult your git provider's documentation for authentication tokens
+
+The server automatically determines your provider based on the repository URL hostname. No manual configuration needed!
 
 ## Installation & Setup
 
@@ -97,7 +133,7 @@ The server supports two transport modes selected via runtime configuration (stdi
 
 Uses standard input/output for communication with a single pre-configured vault.
 
-- Authentication: Pre-configured GitHub PAT and vault settings in `.env` file
+- Authentication: Pre-configured git token and vault settings in `.env` file
 - Users: Single user per deployment
 - Setup: Configure `.env` once, credentials persist across runs
 - Token Storage: Local `.env` file

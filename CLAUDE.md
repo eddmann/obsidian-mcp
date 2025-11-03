@@ -102,7 +102,9 @@ npm run cdk:destroy
 
 **Resource Registration**: `packages/app/src/mcp/resource-registrations.ts` - Registers the vault README resource for on-demand access to vault organization guidelines.
 
-**GitVaultManager**: `packages/app/src/services/git-vault-manager.ts` - Manages git operations with automatic clone/pull on initialization and commit/push after every write operation. Uses authenticated URLs with embedded PAT credentials.
+**GitVaultManager**: `packages/app/src/services/git-vault-manager.ts` - Manages git operations with automatic clone/pull on initialization and commit/push after every write operation. Uses authenticated URLs with embedded credentials (format auto-detected based on provider).
+
+**Git Auth Provider**: `packages/app/src/services/git-auth-provider.ts` - Auto-detects git provider (GitHub, GitLab, Bitbucket, self-hosted) from repository URL and builds provider-specific authenticated URLs.
 
 **Auth Stores**: `packages/app/src/services/auth/stores/` - Provides both in-memory (in-memory-store.ts) and DynamoDB (dynamodb-store.ts) implementations of OAuth session storage.
 
@@ -152,9 +154,13 @@ Session storage:
 
 Required for all modes (CORE_ENV_VARS):
 
-- `VAULT_REPO` - Git repository URL
+- `VAULT_REPO` - Git repository URL (GitHub, GitLab, Bitbucket, self-hosted)
 - `VAULT_BRANCH` - Branch name (typically `main`)
-- `GITHUB_PAT` - Personal Access Token with `repo` scope
+- `GIT_TOKEN` - Personal Access Token (provider auto-detected from URL)
+  - GitHub: PAT with `repo` scope
+  - GitLab: PAT with `api` scope
+  - Bitbucket: App Password with repository read/write
+  - Self-hosted: PAT or password (also requires `GIT_USERNAME`)
 - `JOURNAL_PATH_TEMPLATE` - Path template with `{{date}}` placeholder
 - `JOURNAL_DATE_FORMAT` - Date format for template expansion
 - `JOURNAL_ACTIVITY_SECTION` - Heading for journal entries
@@ -169,6 +175,7 @@ Additional for HTTP/Lambda modes (OAUTH_ENV_VARS):
 
 Optional:
 
+- `GIT_USERNAME` - Username for self-hosted git providers (required for generic providers)
 - `LOCAL_VAULT_PATH` - Local vault directory (default: `./vault-local`)
 - `PORT` - HTTP server port (default: `3000`)
 - `SESSION_EXPIRY_MS` - Session lifetime (default: `86400000` = 24 hours)
@@ -249,7 +256,7 @@ Main tsconfig files:
 
 - **Tests**: The project uses Vitest for testing. Test files are located in `packages/app/tests/` with both behavior tests (e.g., files.spec.ts, directories.spec.ts, search.spec.ts, tags.spec.ts, journal.spec.ts, patch-content.spec.ts, error-handling.spec.ts) and unit tests (e.g., journal-formatter.spec.ts). Use `packages/app/tsconfig.test.json` when adding new tests.
 
-- **Git Credentials**: GitHub PAT is embedded in git URLs as `https://x-access-token:PAT@github.com/...` for authentication. Never log the full URL.
+- **Git Credentials**: Git tokens are embedded in URLs using provider-specific formats (auto-detected). GitHub uses `https://x-access-token:TOKEN@...`, GitLab uses `https://oauth2:TOKEN@...`, etc. Never log the full authenticated URL.
 
 - **Session Security**: PERSONAL_AUTH_TOKEN should be a cryptographically secure random value, not a simple password.
 

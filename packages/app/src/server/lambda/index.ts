@@ -52,7 +52,8 @@ function getVaultManager(): VaultManager {
     const config = {
       repoUrl: process.env.VAULT_REPO!,
       branch: process.env.VAULT_BRANCH!,
-      githubPat: process.env.GITHUB_PAT!,
+      gitToken: process.env.GIT_TOKEN!,
+      gitUsername: process.env.GIT_USERNAME,
       vaultPath: '/tmp/obsidian-vault',
     };
 

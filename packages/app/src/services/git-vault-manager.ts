@@ -4,11 +4,13 @@ import * as path from 'path';
 import { existsSync } from 'fs';
 import { VaultManager } from './vault-manager';
 import { logger } from '@/utils/logger';
+import { getAuthenticatedGitUrl } from './git-auth-provider';
 
 export interface VaultConfig {
   repoUrl: string;
   branch: string;
-  githubPat: string;
+  gitToken: string;
+  gitUsername?: string;
   vaultPath: string;
 }
 
@@ -27,13 +29,15 @@ export class GitVaultManager implements VaultManager {
   }
 
   /**
-   * Create authenticated URL by embedding PAT credentials
+   * Create authenticated URL by embedding credentials
+   * Uses automatic provider detection to determine the correct authentication format
    */
   private getAuthenticatedUrl(): string {
-    const url = new URL(this.config.repoUrl);
-    url.username = 'x-access-token';
-    url.password = this.config.githubPat;
-    return url.toString();
+    return getAuthenticatedGitUrl(
+      this.config.repoUrl,
+      this.config.gitToken,
+      this.config.gitUsername,
+    );
   }
 
   /**
