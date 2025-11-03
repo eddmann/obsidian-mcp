@@ -98,13 +98,13 @@ npm run cdk:destroy
 
 **Tool Definitions**: `packages/app/src/mcp/tool-definitions.ts` - Zod schemas for input/output validation of all tools.
 
-**Tool Handlers**: `packages/app/src/mcp/tool-handlers.ts` - Implementation of tool logic (file operations, search, tags, journal).
+**Tool Handlers**: `packages/app/src/mcp/handlers/` - Implementation of tool logic organized by category (file-handlers.ts, directory-handlers.ts, search-handlers.ts, tag-handlers.ts, journal-handlers.ts).
 
 **Resource Registration**: `packages/app/src/mcp/resource-registrations.ts` - Registers the vault README resource for on-demand access to vault organization guidelines.
 
 **GitVaultManager**: `packages/app/src/services/git-vault-manager.ts` - Manages git operations with automatic clone/pull on initialization and commit/push after every write operation. Uses authenticated URLs with embedded PAT credentials.
 
-**Auth Store**: `packages/app/src/services/auth/auth-store.ts` - Provides both in-memory and DynamoDB implementations of OAuth session storage.
+**Auth Stores**: `packages/app/src/services/auth/stores/` - Provides both in-memory (in-memory-store.ts) and DynamoDB (dynamodb-store.ts) implementations of OAuth session storage.
 
 **Environment Loading**: `packages/app/src/env.ts` - Recursively searches up the directory tree for .env files. Validates CORE_ENV_VARS (for stdio mode) and OAUTH_ENV_VARS (for HTTP/Lambda modes).
 
@@ -112,10 +112,12 @@ npm run cdk:destroy
 
 All write operations automatically commit and push to git:
 
-1. `initialize()` - Clones vault (cold start) or pulls latest (warm start)
+1. `initialize()` - Clones vault (if not exists) or syncs with remote (fetch + reset --hard to match remote exactly)
 2. Write operation executes
-3. `commitAndPush()` - Stages changes, commits with descriptive message, pushes with retry logic
+3. `commitAndPush()` - Stages affected files, commits with descriptive message, pushes with exponential backoff retry (max 3 attempts)
 4. Obsidian clients pull changes to sync
+
+Note: The vault is synced on every invocation to ensure consistency with the remote repository.
 
 ### OAuth Architecture
 
@@ -191,9 +193,10 @@ The server provides 16 tools organized into 5 categories:
 ### Adding a New Tool
 
 1. Define Zod schema in `tool-definitions.ts` (inputSchema, outputSchema)
-2. Implement handler in `tool-handlers.ts` returning `ToolResponse` type
-3. Register tool in `tool-registrations.ts` with appropriate annotations
-4. Update README.md tool count if adding a new category
+2. Implement handler in the appropriate file under `handlers/` (e.g., `file-handlers.ts` for file operations) returning `ToolResponse` type
+3. Export the handler from `handlers/index.ts`
+4. Register tool in `tool-registrations.ts` with appropriate annotations
+5. Update README.md tool count if adding a new category
 
 ### Testing Changes
 
@@ -244,7 +247,7 @@ Main tsconfig files:
 
 ## Important Notes
 
-- **No Tests Currently**: The project has a test setup (Vitest) but no test files exist yet. When adding tests, use `packages/app/tsconfig.test.json`.
+- **Tests**: The project uses Vitest for testing. Test files are located in `packages/app/tests/` with both behavior tests (e.g., files.spec.ts, directories.spec.ts, search.spec.ts, tags.spec.ts, journal.spec.ts, patch-content.spec.ts, error-handling.spec.ts) and unit tests (e.g., journal-formatter.spec.ts). Use `packages/app/tsconfig.test.json` when adding new tests.
 
 - **Git Credentials**: GitHub PAT is embedded in git URLs as `https://x-access-token:PAT@github.com/...` for authentication. Never log the full URL.
 
