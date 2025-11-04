@@ -1,5 +1,6 @@
 import { VaultManager } from '@/services/vault-manager';
 import type { ToolResponse, JournalConfig } from './types';
+import { applyPatch } from 'diff';
 
 type PatchResult = {
   content: string;
@@ -611,4 +612,118 @@ export async function getOrInitializeContent(
   const templateContent = await vault.readFile(config.journalFileTemplate);
 
   return templateContent.replace(/\{\{date\}\}/g, dateStr);
+}
+
+export async function handleApplyDiffPatch(
+  vault: VaultManager,
+  args: {
+    path: string;
+    diff: string;
+  },
+): Promise<ToolResponse> {
+  try {
+    // Verify file exists
+    const exists = await vault.fileExists(args.path);
+    if (!exists) {
+      throw new Error(`File ${args.path} does not exist`);
+    }
+
+    // Validate diff format - must contain at least one hunk header
+    const hunkHeaderRegex = /^@@ -\d+,?\d* \+\d+,?\d* @@/m;
+    if (!hunkHeaderRegex.test(args.diff)) {
+      throw new Error(
+        'Invalid diff format. The diff must be in unified diff format with at least one hunk header ' +
+          '(e.g., "@@ -1,3 +1,3 @@"). Please provide a valid unified diff patch.',
+      );
+    }
+
+    // Read current content
+    const currentContent = await vault.readFile(args.path);
+
+    // Apply the patch with strict matching (no fuzz)
+    const patchedContent = applyPatch(currentContent, args.diff);
+
+    // Check if patch failed - applyPatch returns false when diff doesn't match content
+    if (patchedContent === false) {
+      throw new Error(
+        'Failed to apply patch. The diff may not match the current file content. ' +
+          'Ensure line numbers and context lines in the diff match the file exactly.',
+      );
+    }
+
+    // Calculate changed regions for preview
+    const changePreview = calculateDiffPreview(currentContent, patchedContent, args.diff);
+
+    // Write the patched content
+    await vault.writeFile(args.path, patchedContent);
+
+    return {
+      success: true,
+      data: {
+        success: true,
+        path: args.path,
+        change_preview: changePreview,
+      },
+      metadata: {
+        timestamp: new Date().toISOString(),
+        affected_files: [args.path],
+      },
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message,
+      metadata: { timestamp: new Date().toISOString() },
+    };
+  }
+}
+
+/**
+ * Helper to generate change preview from diff application
+ * Parses the diff to find the first hunk's line range and generates preview
+ */
+function calculateDiffPreview(
+  originalContent: string,
+  patchedContent: string,
+  diff: string,
+):
+  | {
+      line_range: { start: number; end: number };
+      context_before: string[];
+      changed_content: string[];
+      context_after: string[];
+    }
+  | undefined {
+  // Parse the diff to find the first hunk's line range
+  const lines = diff.split('\n');
+  const hunkHeaderRegex = /^@@ -(\d+),?\d* \+(\d+),?(\d*) @@/;
+
+  for (const line of lines) {
+    const match = line.match(hunkHeaderRegex);
+    if (match) {
+      const newStart = parseInt(match[2], 10);
+      const newLines = match[3] ? parseInt(match[3], 10) : 1;
+
+      const allLines = patchedContent.split('\n');
+      const contextSize = 2;
+      const startLine = newStart;
+      const endLine = newStart + newLines - 1;
+
+      const contextBefore = allLines.slice(Math.max(0, startLine - 1 - contextSize), startLine - 1);
+      const changedContent = allLines.slice(startLine - 1, endLine);
+      const contextAfter = allLines.slice(
+        endLine,
+        Math.min(allLines.length, endLine + contextSize),
+      );
+
+      return {
+        line_range: { start: startLine, end: endLine },
+        context_before: contextBefore,
+        changed_content: changedContent,
+        context_after: contextAfter,
+      };
+    }
+  }
+
+  return undefined;
 }

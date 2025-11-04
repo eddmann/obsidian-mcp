@@ -6,11 +6,11 @@ A Model Context Protocol (MCP) server for git-backed Obsidian vaults. Access and
 
 ## Overview
 
-This MCP server provides **17 tools** and **1 resource** to interact with your Obsidian vault:
+This MCP server provides **18 tools** and **1 resource** to interact with your Obsidian vault:
 
 **Tools** (organized into 5 categories):
 
-- File Operations (8) - Read, create, edit, delete, move, append, and patch notes
+- File Operations (9) - Read, create, edit, delete, move, append, and patch notes
 - Directory Operations (3) - Create directories and list files
 - Search - Fuzzy search with fuse.js, optional exact matching, and relevance scoring
 - Tag Management (4) - Add, remove, rename, and manage tags
@@ -314,18 +314,19 @@ Ask your LLM to interact with your Obsidian vault using natural language.
 
 ## Available Tools
 
-### File Operations (8 tools)
+### File Operations (9 tools)
 
-| Tool             | Description                                                                                                       |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `read-note`      | Read the contents of a note file                                                                                  |
-| `read-notes`     | Read multiple notes in a single request for improved efficiency (accepts array of paths, handles partial success) |
-| `create-note`    | Create a new note with content (automatically creates parent directories if needed)                               |
-| `edit-note`      | Replace the entire content of an existing note                                                                    |
-| `delete-note`    | Permanently delete a note file from the vault                                                                     |
-| `move-note`      | Move a note to a different directory or rename it                                                                 |
-| `append-content` | Append content to the end of an existing note, or create a new note if it doesn't exist                           |
-| `patch-content`  | Insert or update content at specific locations: headings, block identifiers, text matches, or YAML frontmatter    |
+| Tool               | Description                                                                                                       |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `read-note`        | Read the contents of a note file                                                                                  |
+| `read-notes`       | Read multiple notes in a single request for improved efficiency (accepts array of paths, handles partial success) |
+| `create-note`      | Create a new note with content (automatically creates parent directories if needed)                               |
+| `edit-note`        | Replace the entire content of an existing note                                                                    |
+| `delete-note`      | Permanently delete a note file from the vault                                                                     |
+| `move-note`        | Move a note to a different directory or rename it                                                                 |
+| `append-content`   | Append content to the end of an existing note, or create a new note if it doesn't exist                           |
+| `patch-content`    | Insert or update content at specific locations: headings, block identifiers, text matches, or YAML frontmatter    |
+| `apply-diff-patch` | Apply a unified diff patch to a file using standard diff format (strict matching, precise line-based changes)     |
 
 ### Directory Operations (3 tools)
 

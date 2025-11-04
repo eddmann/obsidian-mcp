@@ -209,6 +209,27 @@ export function registerTools(server: McpServer, getVaultManager: () => VaultMan
   );
 
   server.registerTool(
+    'apply-diff-patch',
+    {
+      title: 'Apply Diff Patch',
+      description: 'Apply a unified diff patch to a file',
+      inputSchema: toolDefs.ApplyDiffPatchSchema.inputSchema,
+      outputSchema: toolDefs.ApplyDiffPatchSchema.outputSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true, // Modifies file content
+        idempotentHint: false, // Not idempotent - applying twice will fail
+        openWorldHint: true,
+      },
+    },
+    async args => {
+      const vault = getVaultManager();
+      const result = await handlers.handleApplyDiffPatch(vault, args);
+      return formatToolResult(result);
+    },
+  );
+
+  server.registerTool(
     'create-directory',
     {
       title: 'Create Directory',

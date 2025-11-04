@@ -129,6 +129,33 @@ export const PatchContentSchema = {
   },
 };
 
+export const ApplyDiffPatchSchema = {
+  inputSchema: {
+    path: z.string().describe('Path to the file to patch'),
+    diff: z
+      .string()
+      .describe(
+        'Unified diff patch in standard format (e.g., "@@ -1,3 +1,3 @@\\n context\\n-old\\n+new")',
+      ),
+  },
+  outputSchema: {
+    success: z.boolean(),
+    path: z.string(),
+    change_preview: z
+      .object({
+        line_range: z.object({
+          start: z.number().describe('Starting line number (1-based)'),
+          end: z.number().describe('Ending line number (1-based)'),
+        }),
+        context_before: z.array(z.string()).describe('Lines before the change'),
+        changed_content: z.array(z.string()).describe('The modified lines'),
+        context_after: z.array(z.string()).describe('Lines after the change'),
+      })
+      .optional()
+      .describe('Preview of the change with surrounding context'),
+  },
+};
+
 export const CreateDirectorySchema = {
   inputSchema: {
     path: z.string().describe('Path for the new directory'),

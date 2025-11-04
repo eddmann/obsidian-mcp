@@ -94,7 +94,7 @@ npm run cdk:destroy
 
 ### Key Files
 
-**MCP Tool Registration**: `packages/app/src/mcp/tool-registrations.ts` - Registers all 17 MCP tools with the server. Each tool is annotated with hints (readOnlyHint, destructiveHint, idempotentHint, openWorldHint).
+**MCP Tool Registration**: `packages/app/src/mcp/tool-registrations.ts` - Registers all 18 MCP tools with the server. Each tool is annotated with hints (readOnlyHint, destructiveHint, idempotentHint, openWorldHint).
 
 **Tool Definitions**: `packages/app/src/mcp/tool-definitions.ts` - Zod schemas for input/output validation of all tools.
 
@@ -183,9 +183,9 @@ Optional:
 
 ## Tool Categories
 
-The server provides 17 tools organized into 5 categories:
+The server provides 18 tools organized into 5 categories:
 
-**File Operations (8 tools)**: read-note, read-notes, create-note, edit-note, delete-note, move-note, append-content, patch-content
+**File Operations (9 tools)**: read-note, read-notes, create-note, edit-note, delete-note, move-note, append-content, patch-content, apply-diff-patch
 
 **Directory Operations (3 tools)**: create-directory, list-files-in-vault, list-files-in-dir
 
@@ -194,6 +194,49 @@ The server provides 17 tools organized into 5 categories:
 **Tag Management (4 tools)**: add-tags, remove-tags, rename-tag, manage-tags
 
 **Journal Logging (1 tool)**: log-journal-entry (auto-log LLM activity to daily journals)
+
+### apply-diff-patch
+
+The `apply-diff-patch` tool applies unified diff patches to files using standard diff format. This is useful when you have exact line-based changes to make.
+
+**Input Parameters:**
+
+- `path` (string, required) - Path to the file to patch
+- `diff` (string, required) - Unified diff patch in standard format
+
+**Output:**
+
+- `success` (boolean) - Whether the operation succeeded
+- `path` (string) - The file path that was patched
+- `change_preview` (object, optional) - Preview of the changes with context lines
+
+**When to use apply-diff-patch:**
+
+- You have a unified diff patch from another source or tool
+- You want to make multiple precise changes at specific line numbers
+- You prefer standard diff format over anchor-based patching
+- The LLM naturally generated changes in diff format
+
+**Example:**
+
+```typescript
+{
+  path: "Notes/document.md",
+  diff: "@@ -10,3 +10,3 @@\n Context line before\n-Old content to replace\n+New content here\n Context line after"
+}
+```
+
+**Error Handling:**
+
+- The patch must match the current file content exactly (strict matching, no fuzz)
+- If line numbers or context don't match, the operation fails with a clear error message
+- Multi-hunk diffs are supported (multiple changes in one patch)
+
+**Comparison with patch-content:**
+
+- `patch-content` uses semantic anchors (headings, blocks, text patterns) - better when file structure changes
+- `apply-diff-patch` uses line numbers - better for precise, multiple edits at known locations
+- `apply-diff-patch` follows standard unified diff format used by git, diff tools, etc.
 
 ### patch-content Anchor Types
 
@@ -297,7 +340,7 @@ Main tsconfig files:
 
 ## Important Notes
 
-- **Tests**: The project uses Vitest for testing. Test files are located in `packages/app/tests/` with both behavior tests (e.g., files.spec.ts, directories.spec.ts, search.spec.ts, tags.spec.ts, journal.spec.ts, patch-content.spec.ts, error-handling.spec.ts) and unit tests (e.g., journal-formatter.spec.ts). Use `packages/app/tsconfig.test.json` when adding new tests.
+- **Tests**: The project uses Vitest for testing. Test files are located in `packages/app/tests/` with both behavior tests (e.g., files.spec.ts, directories.spec.ts, search.spec.ts, tags.spec.ts, journal.spec.ts, patch-content.spec.ts, apply-diff-patch.spec.ts, error-handling.spec.ts) and unit tests (e.g., journal-formatter.spec.ts). Use `packages/app/tsconfig.test.json` when adding new tests.
 
 - **Git Credentials**: Git tokens are embedded in URLs using provider-specific formats (auto-detected). GitHub uses `https://x-access-token:TOKEN@...`, GitLab uses `https://oauth2:TOKEN@...`, etc. Never log the full authenticated URL.
 
