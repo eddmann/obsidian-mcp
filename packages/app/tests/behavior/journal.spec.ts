@@ -270,21 +270,21 @@ describe('Journal logging behaviour', () => {
     const result = await harness.invoke('patch-content', {
       path: 'Notes/SomeNote.md',
       content: 'Test content',
-      anchor_type: 'line',
-      anchor_value: '1',
-      position: 'after',
+      anchor_type: 'frontmatter',
+      anchor_value: 'title',
+      position: 'replace',
       create_if_missing: true,
     });
 
     expect(result.success).toBe(true);
     const content = await harness.vault.readFile('Notes/SomeNote.md');
 
-    // Should NOT have template content
-    expect(content).not.toContain('date:');
+    // Should NOT have journal template content
     expect(content).not.toContain('## Journal');
+    expect(content).not.toContain('## Activity Log');
 
-    // Should have the patched content
-    expect(content).toContain('Test content');
+    // Should have the frontmatter we added
+    expect(content).toContain('title: Test content');
   });
 
   it('does not use template for non-journal files with append-content', async () => {

@@ -316,16 +316,16 @@ Ask your LLM to interact with your Obsidian vault using natural language.
 
 ### File Operations (8 tools)
 
-| Tool             | Description                                                                                                                 |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `read-note`      | Read the contents of a note file                                                                                            |
-| `read-notes`     | Read multiple notes in a single request for improved efficiency (accepts array of paths, handles partial success)           |
-| `create-note`    | Create a new note with content (automatically creates parent directories if needed)                                         |
-| `edit-note`      | Replace the entire content of an existing note                                                                              |
-| `delete-note`    | Permanently delete a note file from the vault                                                                               |
-| `move-note`      | Move a note to a different directory or rename it                                                                           |
-| `append-content` | Append content to the end of an existing note, or create a new note if it doesn't exist                                     |
-| `patch-content`  | Insert or update content at specific locations: after headings, at line numbers, within code blocks, or in YAML frontmatter |
+| Tool             | Description                                                                                                       |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `read-note`      | Read the contents of a note file                                                                                  |
+| `read-notes`     | Read multiple notes in a single request for improved efficiency (accepts array of paths, handles partial success) |
+| `create-note`    | Create a new note with content (automatically creates parent directories if needed)                               |
+| `edit-note`      | Replace the entire content of an existing note                                                                    |
+| `delete-note`    | Permanently delete a note file from the vault                                                                     |
+| `move-note`      | Move a note to a different directory or rename it                                                                 |
+| `append-content` | Append content to the end of an existing note, or create a new note if it doesn't exist                           |
+| `patch-content`  | Insert or update content at specific locations: headings, block identifiers, text matches, or YAML frontmatter    |
 
 ### Directory Operations (3 tools)
 

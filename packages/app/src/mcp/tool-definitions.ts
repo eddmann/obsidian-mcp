@@ -101,11 +101,13 @@ export const PatchContentSchema = {
     path: z.string().describe('Path to the file'),
     content: z.string().describe('Content to insert'),
     anchor_type: z
-      .enum(['heading', 'block', 'frontmatter', 'line'])
+      .enum(['heading', 'block', 'frontmatter', 'text_match'])
       .describe('Type of anchor to insert at'),
     anchor_value: z
       .string()
-      .describe('Heading name, block ID, frontmatter key, or 1-based line number'),
+      .describe(
+        'Heading name, block ID, frontmatter key, or text content to match (single or multi-line)',
+      ),
     position: z.enum(['before', 'after', 'replace']).describe('Where to insert relative to anchor'),
     create_if_missing: z.boolean().optional().describe('Create file if missing (default: true)'),
   },

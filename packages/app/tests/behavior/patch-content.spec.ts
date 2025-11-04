@@ -60,7 +60,7 @@ describe('Patch content behaviours', () => {
     expect(result.data.change_preview.context_after).toEqual(['Existing content', 'More existing']);
   });
 
-  it('replaces a specific line number', async () => {
+  it('replaces text using single-line text_match', async () => {
     const vault = new InMemoryVaultManager({
       'Notes/lines.md': ['First', 'Second', 'Third'].join('\n'),
     });
@@ -68,8 +68,8 @@ describe('Patch content behaviours', () => {
 
     const result = await harness.invoke('patch-content', {
       path: 'Notes/lines.md',
-      anchor_type: 'line',
-      anchor_value: '2',
+      anchor_type: 'text_match',
+      anchor_value: 'Second',
       position: 'replace',
       content: 'Replacement',
     });
@@ -80,7 +80,7 @@ describe('Patch content behaviours', () => {
     );
   });
 
-  it('returns change preview for line replacement', async () => {
+  it('returns change preview for text_match replacement', async () => {
     const vault = new InMemoryVaultManager({
       'Notes/lines-preview.md': ['Line 1', 'Line 2', 'Line 3', 'Line 4', 'Line 5'].join('\n'),
     });
@@ -88,8 +88,8 @@ describe('Patch content behaviours', () => {
 
     const result = await harness.invoke('patch-content', {
       path: 'Notes/lines-preview.md',
-      anchor_type: 'line',
-      anchor_value: '3',
+      anchor_type: 'text_match',
+      anchor_value: 'Line 3',
       position: 'replace',
       content: 'Replaced line 3',
     });
@@ -188,7 +188,7 @@ describe('Patch content behaviours', () => {
     expect(updated).not.toContain('Old content');
   });
 
-  it('inserts content before a specific line number', async () => {
+  it('inserts content before matched text', async () => {
     const vault = new InMemoryVaultManager({
       'Notes/lines.md': ['Line 1', 'Line 2', 'Line 3'].join('\n'),
     });
@@ -196,8 +196,8 @@ describe('Patch content behaviours', () => {
 
     const result = await harness.invoke('patch-content', {
       path: 'Notes/lines.md',
-      anchor_type: 'line',
-      anchor_value: '2',
+      anchor_type: 'text_match',
+      anchor_value: 'Line 2',
       position: 'before',
       content: 'Inserted',
     });
@@ -208,7 +208,7 @@ describe('Patch content behaviours', () => {
     );
   });
 
-  it('inserts content after a specific line number', async () => {
+  it('inserts content after matched text', async () => {
     const vault = new InMemoryVaultManager({
       'Notes/lines.md': ['Line 1', 'Line 2', 'Line 3'].join('\n'),
     });
@@ -216,8 +216,8 @@ describe('Patch content behaviours', () => {
 
     const result = await harness.invoke('patch-content', {
       path: 'Notes/lines.md',
-      anchor_type: 'line',
-      anchor_value: '2',
+      anchor_type: 'text_match',
+      anchor_value: 'Line 2',
       position: 'after',
       content: 'Inserted',
     });
@@ -300,7 +300,7 @@ describe('Patch content behaviours', () => {
     expect(result.text).toContain('not found');
   });
 
-  it('fails when line number is out of bounds', async () => {
+  it('fails when text pattern is not found', async () => {
     const vault = new InMemoryVaultManager({
       'Notes/short.md': 'Line 1\nLine 2',
     });
@@ -308,14 +308,14 @@ describe('Patch content behaviours', () => {
 
     const result = await harness.invoke('patch-content', {
       path: 'Notes/short.md',
-      anchor_type: 'line',
-      anchor_value: '10',
+      anchor_type: 'text_match',
+      anchor_value: 'Nonexistent text',
       position: 'replace',
       content: 'New content',
     });
 
     expect(result.success).toBe(false);
-    expect(result.text).toContain('out of range');
+    expect(result.text).toContain('not found');
   });
 
   it('creates frontmatter when file has no frontmatter', async () => {
@@ -523,62 +523,321 @@ describe('Patch content behaviours', () => {
     });
   });
 
-  describe('Line number validation', () => {
-    it('rejects string values that cannot be parsed to integers', async () => {
+  describe('Text match features', () => {
+    it('supports multi-line text matching', async () => {
       const vault = new InMemoryVaultManager({
-        'Notes/doc.md': ['Line 1', 'Line 2', 'Line 3'].join('\n'),
+        'Notes/multiline.md': ['Start', 'Block line 1', 'Block line 2', 'Block line 3', 'End'].join(
+          '\n',
+        ),
       });
       harness = new ToolHarness({ vault });
 
       const result = await harness.invoke('patch-content', {
-        path: 'Notes/doc.md',
-        anchor_type: 'line',
-        anchor_value: '**Company Note:**',
+        path: 'Notes/multiline.md',
+        anchor_type: 'text_match',
+        anchor_value: ['Block line 1', 'Block line 2', 'Block line 3'].join('\n'),
         position: 'replace',
-        content: 'New content',
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.text).toContain('Invalid line number');
-      expect(result.text).toContain('must be an integer');
-    });
-
-    it('rejects NaN values with clear error message', async () => {
-      const vault = new InMemoryVaultManager({
-        'Notes/doc.md': ['Line 1', 'Line 2'].join('\n'),
-      });
-      harness = new ToolHarness({ vault });
-
-      const result = await harness.invoke('patch-content', {
-        path: 'Notes/doc.md',
-        anchor_type: 'line',
-        anchor_value: 'not-a-number',
-        position: 'after',
-        content: 'New content',
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.text).toContain('Invalid line number');
-      expect(result.text).toContain('must be an integer');
-    });
-
-    it('accepts valid integer strings', async () => {
-      const vault = new InMemoryVaultManager({
-        'Notes/valid.md': ['Line 1', 'Line 2', 'Line 3'].join('\n'),
-      });
-      harness = new ToolHarness({ vault });
-
-      const result = await harness.invoke('patch-content', {
-        path: 'Notes/valid.md',
-        anchor_type: 'line',
-        anchor_value: '2',
-        position: 'replace',
-        content: 'Replaced content',
+        content: 'Replaced multi-line block',
       });
 
       expect(result.success).toBe(true);
-      const updated = await harness.vault.readFile('Notes/valid.md');
-      expect(updated).toBe(['Line 1', 'Replaced content', 'Line 3'].join('\n'));
+      const updated = await harness.vault.readFile('Notes/multiline.md');
+      expect(updated).toBe(['Start', 'Replaced multi-line block', 'End'].join('\n'));
+    });
+
+    it('fails with helpful error when pattern matches multiple times', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/duplicate.md': [
+          'Section A',
+          'Common line',
+          'Content A',
+          '',
+          'Section B',
+          'Common line',
+          'Content B',
+        ].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/duplicate.md',
+        anchor_type: 'text_match',
+        anchor_value: 'Common line',
+        position: 'replace',
+        content: 'New content',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('found 2 times');
+      expect(result.text).toContain('Lines 2-2');
+      expect(result.text).toContain('Lines 6-6');
+      expect(result.text).toContain('provide more context');
+    });
+
+    it('handles unique match after adding context to pattern', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/context.md': [
+          'Section A',
+          'Common line',
+          'Content A',
+          '',
+          'Section B',
+          'Common line',
+          'Content B',
+        ].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      // Use multi-line pattern to uniquely identify the second occurrence
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/context.md',
+        anchor_type: 'text_match',
+        anchor_value: ['Section B', 'Common line'].join('\n'),
+        position: 'replace',
+        content: 'Replacement for section B',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/context.md');
+      expect(updated).toContain('Replacement for section B');
+      expect(updated).toContain('Section A');
+      expect(updated).toContain('Content A');
+    });
+
+    it('preserves whitespace in text matching', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/whitespace.md': ['Line with  double  spaces', 'Normal line'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/whitespace.md',
+        anchor_type: 'text_match',
+        anchor_value: 'Line with  double  spaces',
+        position: 'replace',
+        content: 'Replaced',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/whitespace.md');
+      expect(updated).toBe(['Replaced', 'Normal line'].join('\n'));
+    });
+
+    it('matches at start of file', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/start.md': ['First line', 'Second line', 'Third line'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/start.md',
+        anchor_type: 'text_match',
+        anchor_value: 'First line',
+        position: 'before',
+        content: 'Before first',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/start.md');
+      expect(updated).toBe(['Before first', 'First line', 'Second line', 'Third line'].join('\n'));
+    });
+
+    it('matches at end of file', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/end.md': ['First line', 'Second line', 'Last line'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/end.md',
+        anchor_type: 'text_match',
+        anchor_value: 'Last line',
+        position: 'after',
+        content: 'After last',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/end.md');
+      expect(updated).toBe(['First line', 'Second line', 'Last line', 'After last'].join('\n'));
+    });
+
+    it('handles multi-line content insertion with after position', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/multiline-content.md': ['Line 1', 'Line 2', 'Line 3'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/multiline-content.md',
+        anchor_type: 'text_match',
+        anchor_value: 'Line 2',
+        position: 'after',
+        content: 'New line A\nNew line B\nNew line C',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data.change_preview.line_range).toEqual({ start: 3, end: 5 });
+      expect(result.data.change_preview.changed_content).toEqual([
+        'New line A',
+        'New line B',
+        'New line C',
+      ]);
+      const updated = await harness.vault.readFile('Notes/multiline-content.md');
+      expect(updated).toBe(
+        ['Line 1', 'Line 2', 'New line A', 'New line B', 'New line C', 'Line 3'].join('\n'),
+      );
+    });
+
+    it('handles multi-line content insertion with before position', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/multiline-before.md': ['Line 1', 'Line 2', 'Line 3'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/multiline-before.md',
+        anchor_type: 'text_match',
+        anchor_value: 'Line 2',
+        position: 'before',
+        content: 'New A\nNew B',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data.change_preview.line_range).toEqual({ start: 2, end: 3 });
+      expect(result.data.change_preview.changed_content).toEqual(['New A', 'New B']);
+      const updated = await harness.vault.readFile('Notes/multiline-before.md');
+      expect(updated).toBe(['Line 1', 'New A', 'New B', 'Line 2', 'Line 3'].join('\n'));
+    });
+
+    it('matches multi-line pattern containing empty lines', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/empty-lines.md': ['Header', '', 'Content', 'Footer'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/empty-lines.md',
+        anchor_type: 'text_match',
+        anchor_value: 'Header\n\nContent', // Pattern includes empty line
+        position: 'replace',
+        content: 'Replaced section',
+      });
+
+      expect(result.success).toBe(true);
+      const updated = await harness.vault.readFile('Notes/empty-lines.md');
+      expect(updated).toBe(['Replaced section', 'Footer'].join('\n'));
+    });
+
+    it('shows empty context_before when match is at line 1', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/first-line.md': ['First', 'Second', 'Third'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/first-line.md',
+        anchor_type: 'text_match',
+        anchor_value: 'First',
+        position: 'replace',
+        content: 'Replaced first',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data.change_preview.context_before).toEqual([]);
+      expect(result.data.change_preview.context_after).toEqual(['Second', 'Third']);
+    });
+
+    it('shows empty context_after when match is at last line', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/last-line.md': ['First', 'Second', 'Last'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/last-line.md',
+        anchor_type: 'text_match',
+        anchor_value: 'Last',
+        position: 'replace',
+        content: 'Replaced last',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data.change_preview.context_before).toEqual(['First', 'Second']);
+      expect(result.data.change_preview.context_after).toEqual([]);
+    });
+
+    it('detects overlapping pattern matches', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/overlap.md': ['AAA', 'AAA', 'AAA'].join('\n'),
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/overlap.md',
+        anchor_type: 'text_match',
+        anchor_value: 'AAA\nAAA',
+        position: 'replace',
+        content: 'Replaced',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('found 2 times');
+      expect(result.text).toContain('Lines 1-2');
+      expect(result.text).toContain('Lines 2-3');
+    });
+
+    it('fails when pattern is longer than file', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/short.md': 'Short',
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/short.md',
+        anchor_type: 'text_match',
+        anchor_value: 'Line 1\nLine 2\nLine 3\nLine 4',
+        position: 'replace',
+        content: 'New',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('not found');
+    });
+
+    it('fails gracefully with empty pattern', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/test.md': 'Some content',
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/test.md',
+        anchor_type: 'text_match',
+        anchor_value: '',
+        position: 'replace',
+        content: 'New content',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('empty');
+    });
+
+    it('fails gracefully with whitespace-only pattern', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/test.md': 'Some content',
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('patch-content', {
+        path: 'Notes/test.md',
+        anchor_type: 'text_match',
+        anchor_value: '   \n\t\n  ',
+        position: 'replace',
+        content: 'New content',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('empty');
     });
   });
 });

@@ -195,6 +195,49 @@ The server provides 17 tools organized into 5 categories:
 
 **Journal Logging (1 tool)**: log-journal-entry (auto-log LLM activity to daily journals)
 
+### patch-content Anchor Types
+
+The `patch-content` tool supports four anchor types for precise content insertion:
+
+1. **heading** - Matches Markdown headings (e.g., `## Section Title`)
+   - Supports before/after/replace positions
+   - Replace mode replaces content under the heading until the next heading
+   - Case-insensitive matching
+
+2. **block** - Matches Obsidian block identifiers (e.g., `^block-id`)
+   - Supports before/after/replace positions
+   - Useful for referencing specific paragraphs or elements
+
+3. **frontmatter** - Updates YAML frontmatter key-value pairs
+   - Creates frontmatter if it doesn't exist
+   - Updates existing keys or adds new ones
+   - Position is always 'replace' for frontmatter
+
+4. **text_match** - Matches exact text content (single-line or multi-line)
+   - **Recommended for precise targeting**: Match the actual content you want to modify
+   - **Multi-line support**: Use `\n` to match multiple consecutive lines for uniqueness
+   - **Ambiguity detection**: Fails with helpful error if pattern matches multiple locations
+   - **Error guidance**: Shows all match locations with context, suggesting more context be added
+   - Supports before/after/replace positions
+   - Exact whitespace matching (preserves spaces, tabs, indentation)
+
+**When to use text_match**:
+
+- When you need precise content matching without relying on line numbers
+- When the same text appears multiple times (add surrounding lines for uniqueness)
+- When you want to ensure the match is still valid even if file content changes
+
+**Example**: To insert content after a unique text block:
+
+```javascript
+{
+  anchor_type: 'text_match',
+  anchor_value: 'Specific paragraph\nThat spans multiple lines',
+  position: 'after',
+  content: 'New content to insert'
+}
+```
+
 ## Common Patterns
 
 ### Adding a New Tool

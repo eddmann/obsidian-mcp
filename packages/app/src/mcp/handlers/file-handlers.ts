@@ -247,7 +247,7 @@ export async function handlePatchContent(
   args: {
     path: string;
     content: string;
-    anchor_type: 'heading' | 'block' | 'frontmatter' | 'line';
+    anchor_type: 'heading' | 'block' | 'frontmatter' | 'text_match';
     anchor_value: string;
     position: 'before' | 'after' | 'replace';
     create_if_missing?: boolean;
@@ -275,10 +275,10 @@ export async function handlePatchContent(
           args.position,
         );
         break;
-      case 'line':
-        patchResult = patchAtLine(
+      case 'text_match':
+        patchResult = patchAtTextMatch(
           currentContent,
-          parseInt(args.anchor_value),
+          args.anchor_value,
           args.content,
           args.position,
         );
@@ -388,39 +388,101 @@ function patchAtHeading(
   throw new Error(`Heading "${heading}" not found`);
 }
 
-function patchAtLine(
+function patchAtTextMatch(
   content: string,
-  lineNumber: number,
+  pattern: string,
   newContent: string,
   position: 'before' | 'after' | 'replace',
 ): PatchResult {
+  // Validate that pattern is not empty
+  if (!pattern || pattern.trim().length === 0) {
+    throw new Error('Text pattern cannot be empty');
+  }
+
   const lines = content.split('\n');
+  const patternLines = pattern.split('\n');
+  const patternLength = patternLines.length;
 
-  if (!Number.isInteger(lineNumber) || isNaN(lineNumber)) {
-    throw new Error(`Invalid line number: "${lineNumber}". Line number must be an integer.`);
+  // Find all matches of the pattern in the content
+  const matches: Array<{ startLine: number; endLine: number }> = [];
+
+  for (let i = 0; i <= lines.length - patternLength; i++) {
+    // Check if the pattern matches at this position
+    let isMatch = true;
+    for (let j = 0; j < patternLength; j++) {
+      if (lines[i + j] !== patternLines[j]) {
+        isMatch = false;
+        break;
+      }
+    }
+
+    if (isMatch) {
+      matches.push({
+        startLine: i + 1, // 1-based
+        endLine: i + patternLength, // 1-based, inclusive
+      });
+    }
   }
 
-  if (lineNumber < 1 || lineNumber > lines.length) {
-    throw new Error(`Line ${lineNumber} out of range (1-${lines.length})`);
+  // Handle different match scenarios
+  if (matches.length === 0) {
+    throw new Error(`Text pattern not found in file`);
   }
 
-  const index = lineNumber - 1;
+  if (matches.length > 1) {
+    // Build detailed error message with context
+    const contextSize = 2;
+    let errorMsg = `Text pattern found ${matches.length} times in file:\n`;
+
+    for (const match of matches) {
+      const startIdx = match.startLine - 1; // Convert to 0-based
+      const endIdx = match.endLine - 1; // Convert to 0-based (inclusive)
+
+      // Get context before
+      const beforeStart = Math.max(0, startIdx - contextSize);
+      const contextBefore = lines.slice(beforeStart, startIdx);
+
+      // Get context after
+      const afterEnd = Math.min(lines.length, endIdx + 1 + contextSize);
+      const contextAfter = lines.slice(endIdx + 1, afterEnd);
+
+      // Build context display
+      errorMsg += `  Lines ${match.startLine}-${match.endLine}:\n`;
+      if (contextBefore.length > 0) {
+        errorMsg += `    ${contextBefore.join('\n    ')}\n`;
+      }
+      errorMsg += `    > ${lines.slice(startIdx, endIdx + 1).join('\n    > ')}\n`;
+      if (contextAfter.length > 0) {
+        errorMsg += `    ${contextAfter.join('\n    ')}\n`;
+      }
+    }
+
+    errorMsg += 'Please provide more context in anchor_value to uniquely identify the location.';
+    throw new Error(errorMsg);
+  }
+
+  // Exactly one match - perform the operation
+  const match = matches[0];
+  const matchStartIdx = match.startLine - 1; // Convert to 0-based
+  const matchEndIdx = match.endLine - 1; // Convert to 0-based (inclusive)
+
   const insertedLines = newContent.split('\n');
   let startLine: number;
   let endLine: number;
 
   if (position === 'before') {
-    lines.splice(index, 0, newContent);
-    startLine = lineNumber;
-    endLine = lineNumber + insertedLines.length - 1;
+    lines.splice(matchStartIdx, 0, newContent);
+    startLine = match.startLine; // 1-based
+    endLine = match.startLine + insertedLines.length - 1;
   } else if (position === 'after') {
-    lines.splice(index + 1, 0, newContent);
-    startLine = lineNumber + 1;
-    endLine = lineNumber + insertedLines.length;
+    lines.splice(matchEndIdx + 1, 0, newContent);
+    startLine = match.endLine + 1; // 1-based
+    endLine = match.endLine + insertedLines.length;
   } else {
-    lines[index] = newContent;
-    startLine = lineNumber;
-    endLine = lineNumber + insertedLines.length - 1;
+    // replace: remove matched lines and insert new content
+    lines.splice(matchStartIdx, patternLength, newContent);
+    startLine = match.startLine; // 1-based
+    endLine = match.startLine + insertedLines.length - 1;
   }
 
   return {
