@@ -231,7 +231,7 @@ npm install
 # 2. Configure environment variables
 cp .env.example .env
 # Edit .env and fill in all required variables including:
-#   - VAULT_REPO, VAULT_BRANCH, GITHUB_PAT (git access)
+#   - VAULT_REPO, VAULT_BRANCH, GIT_TOKEN (git access)
 #   - OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, PERSONAL_AUTH_TOKEN (OAuth)
 #   - JOURNAL_* variables (journal configuration)
 
