@@ -652,7 +652,7 @@ export async function handleApplyDiffPatch(
     }
 
     // Calculate changed regions for preview
-    const changePreview = calculateDiffPreview(currentContent, patchedContent, args.diff);
+    const changePreview = calculateDiffPreview(patchedContent, args.diff);
 
     // Write the patched content
     await vault.writeFile(args.path, patchedContent);
@@ -683,7 +683,6 @@ export async function handleApplyDiffPatch(
  * Parses the diff to find the first hunk's line range and generates preview
  */
 function calculateDiffPreview(
-  originalContent: string,
   patchedContent: string,
   diff: string,
 ):
