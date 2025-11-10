@@ -95,14 +95,19 @@ async function performFuzzySearch(
 
   const filenameMatches = filenameFuse.search(query);
 
-  // Add filename matches with score 1
+  // Add filename matches with quality filtering
   for (const match of filenameMatches) {
     if (results.length >= limit) break;
+
+    const score = match.score || 0;
+
+    // Filter out poor quality matches (score > 0.6)
+    if (score > 0.6) continue;
 
     results.push({
       path: match.item.path,
       match_type: 'filename',
-      relevance_score: 1, // Always 1 for filename matches
+      relevance_score: fuseScoreToRelevance(score),
     });
   }
 
@@ -246,16 +251,19 @@ function findMatchingLines(
   }> = [];
 
   const queryLower = query.toLowerCase();
+  // For fuzzy matching, split query into tokens (words)
+  const queryTokens = isExact ? [] : queryLower.split(/\s+/).filter(t => t.length > 0);
 
   for (let i = 0; i < lines.length; i++) {
     const lineLower = lines[i].toLowerCase();
 
     let isMatch = false;
     if (isExact) {
+      // Exact matching: substring match
       isMatch = lineLower.includes(queryLower);
     } else {
-      // Fuzzy matching - check if query terms appear
-      isMatch = lineLower.includes(queryLower);
+      // Fuzzy matching: all query tokens must appear in line (any order)
+      isMatch = queryTokens.every(token => lineLower.includes(token));
     }
 
     if (isMatch) {
