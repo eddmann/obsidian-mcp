@@ -226,17 +226,10 @@ export const SearchVaultSchema = {
           .min(1)
           .max(4)
           .describe('Match quality: 1=excellent, 2=good, 3=fair, 4=poor'),
-        matches: z
-          .array(
-            z.object({
-              line: z.number(),
-              content: z.string(),
-              context_before: z.array(z.string()),
-              context_after: z.array(z.string()),
-            }),
-          )
+        snippet: z
+          .string()
           .optional()
-          .describe('Line matches (only present for content matches)'),
+          .describe('Snippet of matching content (only present for content matches)'),
       }),
     ),
     total_matches: z.number(),

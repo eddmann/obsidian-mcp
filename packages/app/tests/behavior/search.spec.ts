@@ -28,34 +28,20 @@ describe('Search tool behaviours', () => {
       expect(result.success).toBe(true);
       expect(result.data.results).toHaveLength(2);
 
-      // Both should be content matches
+      // Both should be content matches with snippets
       const alphaMatch = result.data.results.find((r: any) => r.path === 'Notes/alpha.md');
       expect(alphaMatch).toBeDefined();
       expect(alphaMatch.match_type).toBe('content');
       expect(alphaMatch.relevance_score).toBeGreaterThanOrEqual(1);
       expect(alphaMatch.relevance_score).toBeLessThanOrEqual(4);
-      expect(alphaMatch.matches).toEqual([
-        {
-          line: 3,
-          content: 'Contains a keyword',
-          context_before: ['# Alpha', ''],
-          context_after: ['Another line'],
-        },
-      ]);
+      expect(alphaMatch.snippet).toContain('keyword');
 
       const betaMatch = result.data.results.find((r: any) => r.path === 'Notes/beta.md');
       expect(betaMatch).toBeDefined();
       expect(betaMatch.match_type).toBe('content');
       expect(betaMatch.relevance_score).toBeGreaterThanOrEqual(1);
       expect(betaMatch.relevance_score).toBeLessThanOrEqual(4);
-      expect(betaMatch.matches).toEqual([
-        {
-          line: 3,
-          content: 'keyword inside beta',
-          context_before: ['# Beta', ''],
-          context_after: [],
-        },
-      ]);
+      expect(betaMatch.snippet).toContain('keyword');
     });
 
     it('performs case-insensitive search by default', async () => {
@@ -71,7 +57,7 @@ describe('Search tool behaviours', () => {
 
       expect(result.success).toBe(true);
       expect(result.data.results[0].match_type).toBe('content');
-      expect(result.data.results[0].matches).toHaveLength(3);
+      expect(result.data.results[0].snippet).toContain('est'); // Case-insensitive match
     });
 
     it('respects search limit parameter', async () => {
@@ -93,7 +79,7 @@ describe('Search tool behaviours', () => {
       expect(result.data.results.length).toBeLessThanOrEqual(2);
     });
 
-    it('finds multiple content matches in single file', async () => {
+    it('finds content match in file with multiple occurrences', async () => {
       const vault = new InMemoryVaultManager({
         'Notes/multi.md': ['First match', 'No match', 'Second match', 'Third match'].join('\n'),
       });
@@ -107,7 +93,7 @@ describe('Search tool behaviours', () => {
       expect(result.success).toBe(true);
       expect(result.data.results).toHaveLength(1);
       expect(result.data.results[0].match_type).toBe('content');
-      expect(result.data.results[0].matches).toHaveLength(4);
+      expect(result.data.results[0].snippet).toContain('match');
     });
 
     it('properly handles special characters in search query', async () => {
@@ -124,7 +110,7 @@ describe('Search tool behaviours', () => {
       expect(result.success).toBe(true);
       expect(result.data.results).toHaveLength(1);
       expect(result.data.results[0].match_type).toBe('content');
-      expect(result.data.results[0].matches[0].content).toBe('Price: $100 (test)');
+      expect(result.data.results[0].snippet).toContain('$100 (test)');
     });
   });
 
@@ -146,8 +132,7 @@ describe('Search tool behaviours', () => {
       if (contentMatch) {
         expect(contentMatch.relevance_score).toBeGreaterThanOrEqual(1);
         expect(contentMatch.relevance_score).toBeLessThanOrEqual(4);
-        expect(contentMatch.matches).toBeDefined();
-        expect(contentMatch.matches.length).toBeGreaterThan(0);
+        expect(contentMatch.snippet).toBeDefined();
       }
     });
 
@@ -186,7 +171,7 @@ describe('Search tool behaviours', () => {
   });
 
   describe('Filename matching', () => {
-    it('finds filename matches without matches array', async () => {
+    it('finds filename matches without snippet', async () => {
       const vault = new InMemoryVaultManager({
         'Notes/keyword-file.md': 'Some content here',
         'Notes/other.md': 'Contains keyword in content',
@@ -205,13 +190,13 @@ describe('Search tool behaviours', () => {
       );
       expect(filenameMatch).toBeDefined();
       expect(filenameMatch.relevance_score).toBe(1); // Always 1 for filename matches
-      expect(filenameMatch.matches).toBeUndefined(); // No matches array for filename matches
+      expect(filenameMatch.snippet).toBeUndefined(); // No snippet for filename matches
 
       const contentMatch = result.data.results.find(
         (r: any) => r.match_type === 'content' && r.path === 'Notes/other.md',
       );
       expect(contentMatch).toBeDefined();
-      expect(contentMatch.matches).toBeDefined(); // Content matches have matches array
+      expect(contentMatch.snippet).toBeDefined(); // Content matches have snippets
     });
 
     it('returns separate results for filename and content matches in same file', async () => {
@@ -235,56 +220,11 @@ describe('Search tool behaviours', () => {
       const filenameMatch = sameFileResults.find((r: any) => r.match_type === 'filename');
       expect(filenameMatch).toBeDefined();
       expect(filenameMatch.relevance_score).toBe(1);
-      expect(filenameMatch.matches).toBeUndefined();
+      expect(filenameMatch.snippet).toBeUndefined();
 
       const contentMatch = sameFileResults.find((r: any) => r.match_type === 'content');
       expect(contentMatch).toBeDefined();
-      expect(contentMatch.matches).toBeDefined();
-      expect(contentMatch.matches.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('Context lines', () => {
-    it('always includes 2 lines of context for content matches', async () => {
-      const vault = new InMemoryVaultManager({
-        'Notes/doc.md': ['Line 1', 'Line 2', 'Line 3 with match', 'Line 4', 'Line 5'].join('\n'),
-      });
-      harness = new ToolHarness({ vault });
-
-      const result = await harness.invoke('search-vault', {
-        query: 'match',
-        exact: true,
-      });
-
-      expect(result.success).toBe(true);
-      const match = result.data.results[0].matches[0];
-      expect(match.line).toBe(3);
-      expect(match.content).toBe('Line 3 with match');
-      expect(match.context_before).toEqual(['Line 1', 'Line 2']);
-      expect(match.context_after).toEqual(['Line 4', 'Line 5']);
-    });
-
-    it('handles context at file boundaries', async () => {
-      const vault = new InMemoryVaultManager({
-        'Notes/doc.md': ['First match', 'Line 2', 'Last match'].join('\n'),
-      });
-      harness = new ToolHarness({ vault });
-
-      const result = await harness.invoke('search-vault', {
-        query: 'match',
-        exact: true,
-      });
-
-      expect(result.success).toBe(true);
-      const matches = result.data.results[0].matches;
-
-      // First line - no context before
-      expect(matches[0].context_before).toEqual([]);
-      expect(matches[0].context_after).toEqual(['Line 2', 'Last match']);
-
-      // Last line - no context after
-      expect(matches[1].context_before).toEqual(['First match', 'Line 2']);
-      expect(matches[1].context_after).toEqual([]);
+      expect(contentMatch.snippet).toBeDefined();
     });
   });
 
@@ -328,6 +268,62 @@ describe('Search tool behaviours', () => {
     });
   });
 
+  describe('Error handling', () => {
+    it('returns error for empty query', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/doc.md': 'Some content',
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('search-vault', {
+        query: '   ',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('empty');
+    });
+
+    it('returns error for invalid path_filter regex', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/doc.md': 'Some content',
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('search-vault', {
+        query: 'content',
+        path_filter: '[invalid',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.text).toContain('Invalid path_filter');
+    });
+  });
+
+  describe('Result ordering', () => {
+    it('sorts results by relevance score (best first)', async () => {
+      const vault = new InMemoryVaultManager({
+        'Notes/keyword.md': 'unrelated content here', // Filename match = score 1
+        'Notes/other.md': 'this has keyword somewhere in it', // Content match
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('search-vault', {
+        query: 'keyword',
+        exact: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data.results.length).toBeGreaterThan(1);
+
+      // Results should be sorted by relevance_score (ascending = best first)
+      for (let i = 1; i < result.data.results.length; i++) {
+        expect(result.data.results[i].relevance_score).toBeGreaterThanOrEqual(
+          result.data.results[i - 1].relevance_score,
+        );
+      }
+    });
+  });
+
   describe('Default behavior', () => {
     it('defaults to fuzzy search when exact not specified', async () => {
       const vault = new InMemoryVaultManager({
@@ -358,6 +354,24 @@ describe('Search tool behaviours', () => {
       expect(result.success).toBe(true);
       // Should only find .md file by default
       expect(result.data.results.every((r: any) => r.path.endsWith('.md'))).toBe(true);
+    });
+
+    it('finds matches in the middle of large files', async () => {
+      // Create a large file with the match in the middle
+      const padding = 'Lorem ipsum dolor sit amet. '.repeat(100); // ~2800 chars
+      const vault = new InMemoryVaultManager({
+        'Notes/large.md': padding + 'IMPORTANT_KEYWORD_HERE' + padding,
+      });
+      harness = new ToolHarness({ vault });
+
+      const result = await harness.invoke('search-vault', {
+        query: 'IMPORTANT_KEYWORD',
+        exact: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data.results).toHaveLength(1);
+      expect(result.data.results[0].snippet).toContain('IMPORTANT_KEYWORD');
     });
 
     it('defaults to limit of 50 when not specified', async () => {
