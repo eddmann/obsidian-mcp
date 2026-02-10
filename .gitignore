@@ -21,6 +21,12 @@ vault-local/
 .cdk.staging/
 cdk.context.json
 
+# Codex
+.codex/
+
+# Reference docs (local only)
+docs/ref/
+
 # IDE
 .vscode/
 .idea/

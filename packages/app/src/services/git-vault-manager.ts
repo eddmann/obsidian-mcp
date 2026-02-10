@@ -16,9 +16,16 @@ export interface VaultConfig {
 
 export class GitVaultManager implements VaultManager {
   private config: VaultConfig;
+  private initializationPromise: Promise<void> | null = null;
+  private lastSyncedAt = 0;
+  private readonly syncCooldownMs: number;
 
   constructor(config: VaultConfig) {
     this.config = config;
+    this.syncCooldownMs = Math.max(
+      0,
+      parseInt(process.env.VAULT_SYNC_COOLDOWN_MS || '2000', 10) || 2000,
+    );
   }
 
   private createGitInstance(baseDir?: string): SimpleGit {
@@ -60,6 +67,25 @@ export class GitVaultManager implements VaultManager {
    * - Warm start: Sync with remote on every request
    */
   private async initialize(): Promise<void> {
+    const now = Date.now();
+    if (this.lastSyncedAt > 0 && now - this.lastSyncedAt < this.syncCooldownMs) {
+      return;
+    }
+
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+      return;
+    }
+
+    this.initializationPromise = this.runInitialization();
+    try {
+      await this.initializationPromise;
+    } finally {
+      this.initializationPromise = null;
+    }
+  }
+
+  private async runInitialization(): Promise<void> {
     const vaultExists = existsSync(this.config.vaultPath);
 
     if (!vaultExists) {
@@ -72,6 +98,8 @@ export class GitVaultManager implements VaultManager {
       logger.debug('Vault exists, syncing with remote');
       await this.syncVault();
     }
+
+    this.lastSyncedAt = Date.now();
   }
 
   /**
