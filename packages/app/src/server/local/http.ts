@@ -18,6 +18,7 @@ import { registerResources } from '@/mcp/resource-registrations';
 import { registerOAuthRoutes } from '@/server/shared/oauth-routes';
 import { registerMcpRoute } from '@/server/shared/mcp-routes';
 import { createInMemoryAuthStore } from '@/services/auth/stores';
+import { createFirestoreAuthStore } from '@/services/auth/stores/firestore-store';
 import { setAuthStore } from '@/services/auth';
 import { loadEnv, ensureEnvVars } from '@/env';
 import { MCP_SERVER_INSTRUCTIONS } from '@/server/shared/instructions';
@@ -38,7 +39,10 @@ try {
   process.exit(1);
 }
 
-setAuthStore(createInMemoryAuthStore());
+// AUTH_STORE=firestore persists tokens/sessions across restarts (scale-to-zero)
+setAuthStore(
+  process.env.AUTH_STORE === 'firestore' ? createFirestoreAuthStore() : createInMemoryAuthStore(),
+);
 
 const LOCAL_VAULT_PATH = process.env.LOCAL_VAULT_PATH || './vault-local';
 const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || 'obsidian-mcp-client';

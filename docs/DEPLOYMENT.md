@@ -331,9 +331,11 @@ Authorization: Bearer <access_token>
 
 Local HTTP mode:
 
-- Sessions stored in memory
+- Sessions stored in memory by default
 - Lost on server restart
 - Default expiry: 24 hours
+- Set `AUTH_STORE=firestore` to persist sessions/tokens in Google Cloud
+  Firestore instead (see below)
 
 Lambda mode:
 
@@ -341,6 +343,34 @@ Lambda mode:
 - Persist across Lambda invocations
 - TTL-based expiration
 - Default expiry: 24 hours
+
+### Persistent Sessions with Firestore (Cloud Run / scale-to-zero)
+
+The in-memory store loses all OAuth tokens whenever the process restarts, which
+forces clients to re-authenticate. On platforms that scale to zero (e.g. Google
+Cloud Run) this happens after every idle period. Setting `AUTH_STORE=firestore`
+switches HTTP mode to a Firestore-backed store so tokens and sessions survive
+restarts.
+
+```bash
+# One-time GCP setup
+gcloud services enable firestore.googleapis.com
+gcloud firestore databases create --location=REGION
+
+# Grant the service account running the server access
+gcloud projects add-iam-policy-binding PROJECT_ID \
+  --member="serviceAccount:RUNTIME_SA" --role="roles/datastore.user"
+
+# Optional: let Firestore garbage-collect expired entries
+for c in oauth-sessions oauth-auth-codes oauth-access-tokens oauth-refresh-tokens; do
+  gcloud firestore fields ttls update expireAt --collection-group="$c" --enable-ttl --async
+done
+```
+
+Then run HTTP mode with `AUTH_STORE=firestore`. Credentials use Application
+Default Credentials, so on Cloud Run no key files are needed. A single-user
+deployment fits comfortably in Firestore's free tier, making a
+`min-instances=0` Cloud Run service effectively free while idle.
 
 ---
 
