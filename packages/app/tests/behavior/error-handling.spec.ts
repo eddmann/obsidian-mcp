@@ -161,6 +161,33 @@ describe('Cross-cutting error handling behaviours', () => {
     expect(readResult.data.content).toBe('Content with unicode: 你好');
   });
 
+  it('marks failed tool calls with isError so the SDK does not require structuredContent', async () => {
+    harness = new ToolHarness();
+
+    const result = await harness.invoke('read-note', {
+      path: 'Does/Not/Exist.md',
+    });
+
+    // Tools declare an outputSchema, so the SDK rejects any non-error result
+    // lacking structuredContent ("has an output schema but no structured
+    // content was provided"). Failures must therefore set isError: true.
+    expect(result.formatted.isError).toBe(true);
+    expect(result.formatted.structuredContent).toBeUndefined();
+    expect(result.text).toContain('Does/Not/Exist.md');
+  });
+
+  it('always provides structuredContent on successful tool calls', async () => {
+    harness = new ToolHarness();
+
+    const result = await harness.invoke('create-note', {
+      path: 'Note.md',
+      content: 'Hello',
+    });
+
+    expect(result.formatted.isError).toBeUndefined();
+    expect(result.formatted.structuredContent).toEqual({ success: true, path: 'Note.md' });
+  });
+
   it('handles very long file paths', async () => {
     harness = new ToolHarness();
 

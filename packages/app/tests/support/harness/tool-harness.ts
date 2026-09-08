@@ -5,6 +5,7 @@ import { InMemoryVaultManager } from '../doubles/in-memory-vault-manager.js';
 type ToolHandler = (args: Record<string, unknown>) => Promise<{
   content: Array<{ type: 'text'; text: string }>;
   structuredContent?: Record<string, unknown>;
+  isError?: boolean;
 }>;
 
 class FakeMcpServer {
