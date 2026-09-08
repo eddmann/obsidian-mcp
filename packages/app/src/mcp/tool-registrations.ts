@@ -7,25 +7,30 @@ import type { ToolResponse } from '@/mcp/handlers';
 type McpToolResult = {
   content: Array<{ type: 'text'; text: string }>;
   structuredContent?: Record<string, unknown>;
+  isError?: boolean;
 };
 
 function formatToolResult(result: ToolResponse): McpToolResult {
-  const contentText = result.success
-    ? JSON.stringify(result.data ?? {}, null, 2)
-    : (result.error ?? 'Unknown error');
-
-  const response: McpToolResult = {
-    content: [{ type: 'text', text: contentText }],
-  };
-
-  if (result.success && result.data !== undefined) {
-    response.structuredContent =
-      typeof result.data === 'object' && result.data !== null
-        ? (result.data as Record<string, unknown>)
-        : { value: result.data };
+  if (!result.success) {
+    // isError exempts the result from the SDK's structuredContent requirement
+    // for tools that declare an outputSchema, so the error text reaches the client.
+    return {
+      content: [{ type: 'text', text: result.error ?? 'Unknown error' }],
+      isError: true,
+    };
   }
 
-  return response;
+  const structuredContent =
+    result.data === undefined
+      ? {}
+      : typeof result.data === 'object' && result.data !== null
+        ? (result.data as Record<string, unknown>)
+        : { value: result.data };
+
+  return {
+    content: [{ type: 'text', text: JSON.stringify(result.data ?? {}, null, 2) }],
+    structuredContent,
+  };
 }
 
 export function registerTools(server: McpServer, getVaultManager: () => VaultManager): void {
