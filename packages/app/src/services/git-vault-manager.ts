@@ -1,9 +1,10 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { simpleGit, SimpleGit } from 'simple-git';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { existsSync } from 'fs';
 import { VaultManager } from './vault-manager';
-import { logger } from '@/utils/logger';
+import { logger, redactSensitiveText } from '@/utils/logger';
 import { getAuthenticatedGitUrl } from './git-auth-provider';
 
 export interface VaultConfig {
@@ -16,13 +17,41 @@ export interface VaultConfig {
 
 export class GitVaultManager implements VaultManager {
   private config: VaultConfig;
+  private operationQueue: Promise<void> = Promise.resolve();
+  private operationContext = new AsyncLocalStorage<{ active: boolean }>();
+
+  /** Hold the checkout for a whole tool operation, including read-modify-write. */
+  async runOperation<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.operationContext.getStore()?.active) return operation();
+
+    const previous = this.operationQueue;
+    let release!: () => void;
+    this.operationQueue = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    await previous;
+    const context = { active: true };
+    try {
+      return await this.operationContext.run(context, async () => {
+        await this.initialize();
+        return await operation();
+      });
+    } catch (error) {
+      logger.error('Vault operation failed', { error });
+      // Git errors may include an authenticated command URL. Never return it to clients.
+      throw new Error(redactSensitiveText(error instanceof Error ? error.message : String(error)));
+    } finally {
+      context.active = false;
+      release();
+    }
+  }
 
   constructor(config: VaultConfig) {
     this.config = config;
   }
 
   private createGitInstance(baseDir?: string): SimpleGit {
-    const instance = baseDir ? simpleGit(baseDir) : simpleGit();
+    const instance = simpleGit({ baseDir, timeout: { block: 30000 } });
     return instance.env({
       GIT_TERMINAL_PROMPT: '0',
     });
@@ -55,9 +84,9 @@ export class GitVaultManager implements VaultManager {
   }
 
   /**
-   * Initialize the vault (clone or sync on every invocation)
+   * Initialize the vault once per serialized operation
    * - Cold start: Clone the repo if it doesn't exist
-   * - Warm start: Sync with remote on every request
+   * - Warm start: Sync once before the operation reads or writes files
    */
   private async initialize(): Promise<void> {
     const vaultExists = existsSync(this.config.vaultPath);
@@ -75,31 +104,27 @@ export class GitVaultManager implements VaultManager {
   }
 
   /**
-   * Remove the vault directory completely
-   */
-  private async removeVault(): Promise<void> {
-    if (existsSync(this.config.vaultPath)) {
-      logger.debug('Removing vault directory for fresh clone');
-      await fs.rm(this.config.vaultPath, { recursive: true, force: true });
-    }
-  }
-
-  /**
    * Clone the vault repository (cold start)
    */
   private async cloneVault(): Promise<void> {
     const tempGit = this.createGitInstance();
     const authUrl = this.getAuthenticatedUrl();
 
-    await tempGit.clone(authUrl, this.config.vaultPath, {
-      '--depth': 1,
-      '--branch': this.config.branch,
-      '--single-branch': null,
-    });
-
-    const vaultGit = this.createGitInstance(this.config.vaultPath);
-    await vaultGit.addConfig('user.name', 'Obsidian MCP Server');
-    await vaultGit.addConfig('user.email', 'mcp@obsidian.local');
+    await fs.mkdir(path.dirname(this.config.vaultPath), { recursive: true });
+    const stagingPath = await fs.mkdtemp(`${this.config.vaultPath}-clone-`);
+    try {
+      await tempGit.clone(authUrl, stagingPath, {
+        '--depth': 1,
+        '--branch': this.config.branch,
+        '--single-branch': null,
+      });
+      const vaultGit = this.createGitInstance(stagingPath);
+      await vaultGit.addConfig('user.name', 'Obsidian MCP Server');
+      await vaultGit.addConfig('user.email', 'mcp@obsidian.local');
+      await fs.rename(stagingPath, this.config.vaultPath);
+    } finally {
+      await fs.rm(stagingPath, { recursive: true, force: true });
+    }
   }
 
   /**
@@ -114,34 +139,23 @@ export class GitVaultManager implements VaultManager {
       // Set the remote URL with embedded credentials for authenticated operations
       await vaultGit.remote(['set-url', 'origin', authUrl]);
 
-      // Fetch latest remote state with timeout
-      logger.debug('Fetching latest changes from remote');
-      await Promise.race([
-        vaultGit.fetch('origin', this.config.branch),
-        new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error('Fetch timeout')), 5000),
-        ),
-      ]);
-
-      // Reset to clean "as cloned" state - matches remote exactly
-      logger.debug('Resetting vault to clean state');
-      await vaultGit.reset(['--hard', `origin/${this.config.branch}`]);
-
-      // Remove untracked files and directories (-f = force, -d = directories, -x = ignored files)
-      await vaultGit.clean('fdx');
+      // A real process timeout stops Git before the checkout can be reused.
+      await vaultGit.fetch('origin', this.config.branch);
+      // Preserve unpushed commits and local files after a failed write. Divergence
+      // fails closed instead of deleting the checkout and losing local changes.
+      await vaultGit.merge(['--ff-only', `origin/${this.config.branch}`]);
 
       logger.info('Vault synced with remote', {
         durationMs: Date.now() - startTime,
         branch: this.config.branch,
       });
     } catch (error) {
-      logger.error('Sync failed, removing vault and performing fresh clone', {
+      logger.error('Vault sync failed; preserving checkout', {
         error,
         durationMs: Date.now() - startTime,
         branch: this.config.branch,
       });
-      await this.removeVault();
-      await this.cloneVault();
+      throw error;
     }
   }
 
@@ -158,13 +172,11 @@ export class GitVaultManager implements VaultManager {
       await vaultGit.raw(['add', '-A']);
     }
 
-    const status = await vaultGit.status();
-    if (status.files.length === 0) {
-      logger.debug('No changes to commit');
-      return;
+    const stagedFiles = await vaultGit.diff(['--cached', '--name-only']);
+    if (stagedFiles.trim()) {
+      await vaultGit.commit(message);
     }
-
-    await vaultGit.commit(message);
+    // A retry may have no new diff but still have a commit whose push failed.
     await this.pushWithRetry(vaultGit, 3);
   }
 
@@ -207,14 +219,15 @@ export class GitVaultManager implements VaultManager {
    * Read a file from the vault
    */
   async readFile(relativePath: string): Promise<string> {
-    await this.initialize();
-    const fullPath = path.join(this.config.vaultPath, relativePath);
+    return this.runOperation(async () => {
+      const fullPath = path.join(this.config.vaultPath, relativePath);
 
-    try {
-      return await fs.readFile(fullPath, 'utf-8');
-    } catch (error: any) {
-      throw new Error(`Failed to read file ${relativePath}: ${error.message}`);
-    }
+      try {
+        return await fs.readFile(fullPath, 'utf-8');
+      } catch (error: any) {
+        throw new Error(`Failed to read file ${relativePath}: ${error.message}`);
+      }
+    });
   }
 
   /**
@@ -222,18 +235,19 @@ export class GitVaultManager implements VaultManager {
    * Automatically commits and pushes the change
    */
   async writeFile(relativePath: string, content: string): Promise<void> {
-    await this.initialize();
-    const fullPath = path.join(this.config.vaultPath, relativePath);
+    return this.runOperation(async () => {
+      const fullPath = path.join(this.config.vaultPath, relativePath);
 
-    const dir = path.dirname(fullPath);
-    await fs.mkdir(dir, { recursive: true });
+      const dir = path.dirname(fullPath);
+      await fs.mkdir(dir, { recursive: true });
 
-    await fs.writeFile(fullPath, content, 'utf-8');
-    await this.commitAndPush(`Update file: ${relativePath}`, [relativePath]);
+      await fs.writeFile(fullPath, content, 'utf-8');
+      await this.commitAndPush(`Update file: ${relativePath}`, [relativePath]);
 
-    logger.debug('File written successfully', {
-      path: relativePath,
-      sizeBytes: content.length,
+      logger.debug('File written successfully', {
+        path: relativePath,
+        sizeBytes: content.length,
+      });
     });
   }
 
@@ -242,24 +256,25 @@ export class GitVaultManager implements VaultManager {
    * Automatically commits and pushes the change
    */
   async deleteFile(relativePath: string): Promise<void> {
-    await this.initialize();
-    const fullPath = path.join(this.config.vaultPath, relativePath);
+    return this.runOperation(async () => {
+      const fullPath = path.join(this.config.vaultPath, relativePath);
 
-    try {
-      const stats = await this.getFileStats(relativePath);
-      if (stats.isDirectory) {
-        throw new Error(`Cannot delete ${relativePath}: it is a directory`);
+      try {
+        const stats = await this.getFileStats(relativePath);
+        if (stats.isDirectory) {
+          throw new Error(`Cannot delete ${relativePath}: it is a directory`);
+        }
+
+        await fs.unlink(fullPath);
+        await this.commitAndPush(`Delete file: ${relativePath}`, [relativePath]);
+
+        logger.debug('File deleted successfully', {
+          path: relativePath,
+        });
+      } catch (error: any) {
+        throw new Error(`Failed to delete file ${relativePath}: ${error.message}`);
       }
-
-      await fs.unlink(fullPath);
-      await this.commitAndPush(`Delete file: ${relativePath}`, [relativePath]);
-
-      logger.debug('File deleted successfully', {
-        path: relativePath,
-      });
-    } catch (error: any) {
-      throw new Error(`Failed to delete file ${relativePath}: ${error.message}`);
-    }
+    });
   }
 
   /**
@@ -267,24 +282,26 @@ export class GitVaultManager implements VaultManager {
    * Automatically commits and pushes the change
    */
   async moveFile(sourcePath: string, destPath: string): Promise<void> {
-    await this.initialize();
-    const fullSourcePath = path.join(this.config.vaultPath, sourcePath);
-    const fullDestPath = path.join(this.config.vaultPath, destPath);
+    return this.runOperation(async () => {
+      const fullSourcePath = path.join(this.config.vaultPath, sourcePath);
+      const fullDestPath = path.join(this.config.vaultPath, destPath);
 
-    const destDir = path.dirname(fullDestPath);
-    await fs.mkdir(destDir, { recursive: true });
+      const destDir = path.dirname(fullDestPath);
+      await fs.mkdir(destDir, { recursive: true });
 
-    await fs.rename(fullSourcePath, fullDestPath);
-    await this.commitAndPush(`Move file: ${sourcePath} → ${destPath}`, [sourcePath, destPath]);
+      await fs.rename(fullSourcePath, fullDestPath);
+      await this.commitAndPush(`Move file: ${sourcePath} → ${destPath}`, [sourcePath, destPath]);
+    });
   }
 
   /**
    * Create a directory
    */
   async createDirectory(relativePath: string, recursive: boolean): Promise<void> {
-    await this.initialize();
-    const fullPath = path.join(this.config.vaultPath, relativePath);
-    await fs.mkdir(fullPath, { recursive });
+    return this.runOperation(async () => {
+      const fullPath = path.join(this.config.vaultPath, relativePath);
+      await fs.mkdir(fullPath, { recursive });
+    });
   }
 
   /**
@@ -298,13 +315,14 @@ export class GitVaultManager implements VaultManager {
       recursive?: boolean;
     } = {},
   ): Promise<string[]> {
-    await this.initialize();
-    const fullPath = path.join(this.config.vaultPath, relativePath);
+    return this.runOperation(async () => {
+      const fullPath = path.join(this.config.vaultPath, relativePath);
 
-    const files: string[] = [];
-    await this.walkDirectory(fullPath, this.config.vaultPath, files, options);
+      const files: string[] = [];
+      await this.walkDirectory(fullPath, this.config.vaultPath, files, options);
 
-    return files;
+      return files;
+    });
   }
 
   /**
@@ -355,9 +373,10 @@ export class GitVaultManager implements VaultManager {
    * Check if a file exists
    */
   async fileExists(relativePath: string): Promise<boolean> {
-    await this.initialize();
-    const fullPath = path.join(this.config.vaultPath, relativePath);
-    return existsSync(fullPath);
+    return this.runOperation(async () => {
+      const fullPath = path.join(this.config.vaultPath, relativePath);
+      return existsSync(fullPath);
+    });
   }
 
   /**
@@ -368,7 +387,6 @@ export class GitVaultManager implements VaultManager {
     modified: Date;
     isDirectory: boolean;
   }> {
-    await this.initialize();
     const fullPath = path.join(this.config.vaultPath, relativePath);
 
     try {

@@ -23,6 +23,28 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   error: 3,
 };
 
+/** Redact credentials in messages as well as nested Git command arguments. */
+export function redactSensitiveText(value: string): string {
+  let result = value.replace(/(https?:\/\/)[^\s/@]+@/gi, '$1[REDACTED]@');
+  for (const key of ['GIT_TOKEN', 'OAUTH_CLIENT_SECRET', 'PERSONAL_AUTH_TOKEN']) {
+    const secret = process.env[key];
+    if (secret) {
+      result = result.split(secret).join('[REDACTED]');
+      result = result.split(encodeURIComponent(secret)).join('[REDACTED]');
+    }
+  }
+  return result;
+}
+
+function redactLogValue(key: string, value: unknown): unknown {
+  if (/token|secret|password|authorization|cookie/i.test(key)) return '[REDACTED]';
+  if (typeof value === 'string') return redactSensitiveText(value);
+  if (value instanceof Error) {
+    return { ...value, name: value.name, message: value.message, stack: value.stack };
+  }
+  return value;
+}
+
 class Logger {
   private minLevel: number;
   private stream: NodeJS.WriteStream;
@@ -46,7 +68,7 @@ class Logger {
       context,
     };
 
-    this.stream.write(JSON.stringify(entry) + '\n');
+    this.stream.write(JSON.stringify(entry, redactLogValue) + '\n');
   }
 
   debug(message: string, context?: LogContext): void {

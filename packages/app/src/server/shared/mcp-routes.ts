@@ -43,9 +43,9 @@ async function authenticateToken(req: Request, res: Response, next: NextFunction
  * OAuth authentication is always required for the MCP endpoint.
  *
  * @param app - Express application
- * @param mcpServer - MCP server instance
+ * @param createMcpServer - Factory for a request-scoped MCP server
  */
-export function registerMcpRoute(app: Express, mcpServer: McpServer): void {
+export function registerMcpRoute(app: Express, createMcpServer: () => McpServer): void {
   app.get('/health', (_req, res) => {
     res.json({
       status: 'ok',
@@ -66,13 +66,24 @@ export function registerMcpRoute(app: Express, mcpServer: McpServer): void {
     const method = req.body?.method || 'unknown';
     const requestId = req.body?.id;
 
+    const mcpServer = createMcpServer();
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
     });
 
-    res.on('close', () => {
-      transport.close();
+    res.once('finish', () => {
+      logger.info('MCP request completed', {
+        method,
+        tool: method === 'tools/call' ? req.body?.params?.name : undefined,
+        requestId,
+        durationMs: Date.now() - startTime,
+        statusCode: res.statusCode,
+        success: res.statusCode < 400,
+      });
+    });
+    res.once('close', () => {
+      mcpServer.close().catch(error => logger.error('MCP cleanup failed', { error }));
     });
 
     try {
@@ -83,13 +94,6 @@ export function registerMcpRoute(app: Express, mcpServer: McpServer): void {
 
       await mcpServer.connect(transport);
       await transport.handleRequest(req, res, req.body);
-
-      logger.info('MCP request completed', {
-        method,
-        requestId,
-        durationMs: Date.now() - startTime,
-        success: true,
-      });
     } catch (error) {
       logger.error('Error handling MCP request', {
         error,

@@ -59,14 +59,17 @@ const vaultManager = new GitVaultManager({
   vaultPath: LOCAL_VAULT_PATH,
 });
 
-const mcpServer = new McpServer({
-  name: 'obsidian-mcp',
-  version: '1.0.0',
-  instructions: MCP_SERVER_INSTRUCTIONS,
-});
+function createMcpServer(): McpServer {
+  const mcpServer = new McpServer({
+    name: 'obsidian-mcp',
+    version: '1.0.0',
+    instructions: MCP_SERVER_INSTRUCTIONS,
+  });
 
-registerTools(mcpServer, () => vaultManager);
-registerResources(mcpServer, () => vaultManager);
+  registerTools(mcpServer, () => vaultManager);
+  registerResources(mcpServer, () => vaultManager);
+  return mcpServer;
+}
 
 const app = express();
 app.use(express.json());
@@ -78,7 +81,7 @@ registerOAuthRoutes(app, {
   baseUrl: BASE_URL,
 });
 
-registerMcpRoute(app, mcpServer);
+registerMcpRoute(app, createMcpServer);
 
 const PORT = parseInt(process.env.PORT || '3000');
 
@@ -107,7 +110,7 @@ Health Check:
 
 Configure ChatGPT/Claude with:
   - Client ID: ${OAUTH_CLIENT_ID}
-  - Client Secret: ${OAUTH_CLIENT_SECRET}
+  - Client Secret: (configured; hidden)
   - Authorization URL: ${BASE_URL}/oauth/authorize
   - Token URL: ${BASE_URL}/oauth/token
   `);

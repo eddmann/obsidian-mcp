@@ -1,3 +1,4 @@
+import { configureLogger } from '@/utils/logger';
 import { registerTools } from '@/mcp/tool-registrations';
 import { VaultManager } from '@/services/vault-manager';
 import { InMemoryVaultManager } from '../doubles/in-memory-vault-manager.js';
@@ -30,6 +31,7 @@ export class ToolHarness {
   private envBackup: Map<string, string | undefined> = new Map();
 
   constructor(options: ToolHarnessOptions = {}) {
+    configureLogger({ stream: process.stderr, minLevel: 'error' });
     // Create vault with default journal template if not provided
     const defaultTemplate = 'Templates/Daily Note.md';
     const templateContent = `---
