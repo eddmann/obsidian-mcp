@@ -138,4 +138,18 @@ describe('Git operation isolation', () => {
     expect(await readFile(path.join(checkout, 'pending.md'), 'utf8')).toBe('preserve');
     expect(await simpleGit(remote).show(['main:external.md'])).toBe('new external');
   });
+
+  it('clones into a pre-created empty vault directory instead of syncing it', async () => {
+    await mkdir(checkout);
+    const result = await runVaultOperation(vault, () => vault.readFile('0.md'));
+    expect(result).toBe('needle 0\n');
+    expect(logs.filter(x => x.message === 'Cloning vault')).toHaveLength(1);
+  });
+
+  it('refuses to overwrite a non-empty vault directory that is not a git checkout', async () => {
+    await mkdir(checkout);
+    await writeFile(path.join(checkout, 'stray.md'), 'keep me');
+    await expect(vault.readFile('0.md')).rejects.toThrow(/not a git checkout/);
+    expect(await readFile(path.join(checkout, 'stray.md'), 'utf8')).toBe('keep me');
+  });
 });

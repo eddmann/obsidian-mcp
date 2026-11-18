@@ -89,9 +89,20 @@ export class GitVaultManager implements VaultManager {
    * - Warm start: Sync once before the operation reads or writes files
    */
   private async initialize(): Promise<void> {
-    const vaultExists = existsSync(this.config.vaultPath);
+    // A directory without .git (e.g. an empty mount point or a pre-created
+    // LOCAL_VAULT_PATH) is not a checkout and must not be synced.
+    const hasCheckout = existsSync(path.join(this.config.vaultPath, '.git'));
 
-    if (!vaultExists) {
+    if (!hasCheckout) {
+      if (existsSync(this.config.vaultPath)) {
+        const entries = await fs.readdir(this.config.vaultPath);
+        if (entries.length > 0) {
+          throw new Error(
+            `Vault path ${this.config.vaultPath} exists but is not a git checkout; refusing to overwrite it`,
+          );
+        }
+        await fs.rmdir(this.config.vaultPath);
+      }
       logger.info('Cloning vault', {
         repoUrl: this.sanitizeUrl(this.config.repoUrl),
         branch: this.config.branch,
