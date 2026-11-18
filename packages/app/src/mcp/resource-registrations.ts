@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { VaultManager } from '@/services/vault-manager';
+import { runVaultOperation, type VaultManager } from '@/services/vault-manager';
+import { logger, redactSensitiveText } from '@/utils/logger';
 
 /**
  * Register MCP resources with the server
@@ -24,46 +25,49 @@ export function registerResources(server: McpServer, getVaultManager: () => Vaul
     async uri => {
       const vault = getVaultManager();
 
-      try {
-        const readmeExists = await vault.fileExists('README.md');
+      return runVaultOperation(vault, async () => {
+        try {
+          const readmeExists = await vault.fileExists('README.md');
 
-        if (!readmeExists) {
+          if (!readmeExists) {
+            return {
+              contents: [
+                {
+                  uri: uri.href,
+                  mimeType: 'text/markdown',
+                  text: 'No README.md found in vault root.',
+                },
+              ],
+            };
+          }
+
+          const content = await vault.readFile('README.md');
+
           return {
             contents: [
               {
                 uri: uri.href,
                 mimeType: 'text/markdown',
-                text: 'No README.md found in vault root.',
+                text: content,
+              },
+            ],
+          };
+        } catch (error) {
+          logger.warn('Vault resource failed', { error });
+          const errorMessage =
+            error instanceof Error ? error.message : 'Unknown error reading README.md';
+
+          return {
+            contents: [
+              {
+                uri: uri.href,
+                mimeType: 'text/markdown',
+                text: `Error reading vault README: ${redactSensitiveText(errorMessage)}`,
               },
             ],
           };
         }
-
-        const content = await vault.readFile('README.md');
-
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              mimeType: 'text/markdown',
-              text: content,
-            },
-          ],
-        };
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error reading README.md';
-
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              mimeType: 'text/markdown',
-              text: `Error reading vault README: ${errorMessage}`,
-            },
-          ],
-        };
-      }
+      });
     },
   );
 }

@@ -63,14 +63,17 @@ function getVaultManager(): VaultManager {
   return vaultManager;
 }
 
-const mcpServer = new McpServer({
-  name: 'obsidian-mcp',
-  version: '1.0.0',
-  instructions: MCP_SERVER_INSTRUCTIONS,
-});
+function createMcpServer(): McpServer {
+  const mcpServer = new McpServer({
+    name: 'obsidian-mcp',
+    version: '1.0.0',
+    instructions: MCP_SERVER_INSTRUCTIONS,
+  });
 
-registerTools(mcpServer, getVaultManager);
-registerResources(mcpServer, getVaultManager);
+  registerTools(mcpServer, getVaultManager);
+  registerResources(mcpServer, getVaultManager);
+  return mcpServer;
+}
 
 const OAUTH_CLIENT_ID = process.env.OAUTH_CLIENT_ID || 'obsidian-mcp-client';
 const OAUTH_CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET;
@@ -150,7 +153,7 @@ registerOAuthRoutes(app, {
   baseUrl: BASE_URL,
 });
 
-registerMcpRoute(app, mcpServer);
+registerMcpRoute(app, createMcpServer);
 
 app.get('/health', (_req, res) => {
   res.json({
